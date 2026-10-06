@@ -1,0 +1,7 @@
+kubernetes==33.1.0
+numpy==1.24.3
+numpy==1.24.4
+pandas==2.0.3
+Requests==2.32.4
+schedule==1.2.2
+tabulate==0.8.10

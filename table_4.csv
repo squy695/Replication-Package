@@ -1,0 +1,19 @@
+benchmark,method,perf_before_mean,perf_before_std,perf_after_mean,perf_after_std
+online boutique,Showar,0.6801,0.0762,0.5667,0.0479
+online boutique,Microscaler,0.586,0.0961,0.4439,0.0612
+online boutique,PBScaler,0.523,0.111,0.5215,0.0925
+online boutique,Derm,0.5859,0.0818,0.5116,0.122
+online boutique,KHPA,0.6626,0.0562,0.6402,0.0123
+online boutique,Squanler,0.7168,0.0619,0.8347,0.0033
+sock shop,Showar,0.5869,0.0428,0.4163,0.0697
+sock shop,Microscaler,0.6464,0.085,0.524,0.0453
+sock shop,PBScaler,0.7267,0.1366,0.6242,0.0414
+sock shop,Derm,0.6876,0.1746,0.6359,0.1505
+sock shop,KHPA,0.8076,0.0371,0.6832,0.0127
+sock shop,Squanler,0.8305,0.0069,0.8364,0.0027
+media microservice,Showar,0.3595,0.057,0.2894,0.1592
+media microservice,Microscaler,0.6484,0.0498,0.3985,0.0515
+media microservice,PBScaler,0.5912,0.0682,0.4998,0.0595
+media microservice,Derm,0.5579,0.0395,0.499,0.1105
+media microservice,KHPA,0.702,0.0728,0.6424,0.0222
+media microservice,Squanler,0.7619,0.0475,0.8352,0.0057
