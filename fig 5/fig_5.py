@@ -7,12 +7,15 @@ import numpy as np
 import pandas as pd
 from matplotlib import rcParams
 from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrowPatch, Rectangle
 from scipy.interpolate import interp1d
 from scipy.stats import spearmanr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 F7 = os.path.join(HERE, '..', 'data', 'motivation')
 OUT_PDF = os.path.join(os.path.dirname(HERE), 'fig_SRCC.pdf')
+
+PNG_DPI = 300          # resolution of the raster copy (dots per inch)
 
 NORMALIZE = True
 MAX_LAG = 6
@@ -39,13 +42,15 @@ API_STYLES = [
     ('API5',      '/pay',      'API5',      '#8A924A', '-',  'p'),
 ]
 
+# Panel order: the four traditional signals fill the first two columns, while the third
+# column groups the two workload panels (ours on top, the ground truth below).
 PANELS = [
-    ('Ground-truth workload',      'actual', None,                      0, 0),
     ('Latency with HTTP 200',                 'quant',  'latency 200.csv', 0, 0),
     ('Latency with HTTP 500',                 'quant',  'latency 500.csv', 0, 0),
+    ('Our quantified workload',    'quant',  'our quantified workload.csv',  10, 10),
     ('RPS with HTTP 200',                          'quant',  'RPS 200.csv',        0, 0),
     ('RPS with HTTP 500',                          'quant',  'RPS 500.csv',        0, 0),
-    ('Our quantified workload',    'quant',  'our quantified workload.csv',  10, 10),
+    ('Ground-truth workload',      'actual', None,                      0, 0),
 ]
 
 
@@ -117,7 +122,7 @@ for title, kind, fname, head, tail in PANELS:
     data.append((title, kind, fname, panel_norm(drawn), full))
 
 N_ROW, N_COL = 2, 3
-# Layout.
+# Layout: the three columns are evenly spaced (wspace in subplots_adjust below).
 fig, axes = plt.subplots(N_ROW, N_COL, figsize=(16, 6.6))
 
 for idx, (ax, (title, kind, fname, series, _full)) in enumerate(zip(axes.ravel(), data)):
@@ -147,8 +152,9 @@ legend_handles = [
 ]
 legend_labels = [lab for _, _, lab, _, _, _ in API_STYLES]
 
+LEGEND_Y = 0.96         # y of the legend's lower edge in figure coords; larger = further from the panels
 fig.legend(handles=legend_handles, labels=legend_labels, loc='lower center',
-           bbox_to_anchor=(0.5, 0.90), ncol=5,
+           bbox_to_anchor=(0.5, LEGEND_Y), ncol=5,
            frameon=False, fontsize=25,
            handlelength=2.6, handletextpad=0.6, columnspacing=1.8)
 
@@ -159,9 +165,42 @@ fig.supylabel('Normalized Value' if NORMALIZE else 'Value',
 plt.tight_layout()
 plt.subplots_adjust(left=0.09, right=0.97, bottom=0.13, top=0.90, hspace=0.12, wspace=0.06)
 
+# Annotation: the four traditional-signal panels are integrated by Eq. (3) into panel 3.
+# Drawn as vector artists in figure coordinates, so it costs almost nothing in file size.
+# The offsets below are measured (in units of the panel block) from the reference
+# annotation, so the geometry follows the panels if the layout changes.
+ANNOT_COLOR = '#C85250'          # same red as API1
+metric_boxes = [axes[r, c].get_position() for r in range(N_ROW) for c in (0, 1)]
+bx0 = min(b.x0 for b in metric_boxes)
+bx1 = max(b.x1 for b in metric_boxes)
+by0 = min(b.y0 for b in metric_boxes)
+by1 = max(b.y1 for b in metric_boxes)
+bw, bh = bx1 - bx0, by1 - by0
+
+box_x0, box_x1 = bx0 - 0.0125 * bw, bx1 + 0.0115 * bw          # dashed frame around them
+box_y0, box_y1 = by0 - 0.0243 * bh, by1 + 0.0249 * bh
+fig.add_artist(Rectangle((box_x0, box_y0), box_x1 - box_x0, box_y1 - box_y0,
+                         transform=fig.transFigure, fill=False, edgecolor=ANNOT_COLOR,
+                         linewidth=4.5, linestyle=(0, (7, 5)), zorder=30))
+
+target = axes[0, 2].get_position()
+elbow_y = by1 + 0.102 * bh                                     # horizontal run, above the panels
+run_x0 = bx1 - 0.0663 * bw                                     # its left end, above panel 2
+vert_x = target.x0 + 0.122 * target.width                      # drop lands in panel 3, near its left
+fig.add_artist(Line2D([run_x0, vert_x], [elbow_y, elbow_y], transform=fig.transFigure,
+                      color=ANNOT_COLOR, linewidth=6, zorder=30, solid_capstyle='butt'))
+fig.add_artist(FancyArrowPatch((vert_x, elbow_y), (vert_x, by1 + 0.0015 * bh),
+                               transform=fig.transFigure, zorder=30,
+                               arrowstyle='-|>', mutation_scale=30,
+                               color=ANNOT_COLOR, linewidth=6))
+fig.text(vert_x + 0.024 * target.width, by1 + 0.0505 * bh, 'Integrated by Eq.(3)',
+         color=ANNOT_COLOR, fontsize=22, va='center', ha='left', zorder=30)
+
 os.makedirs(os.path.dirname(OUT_PDF), exist_ok=True)
-# Write the figure to the package root.
+# Write the figure to the package root: the vector PDF for the paper and the same
+# figure as a PNG (for slides and quick previews).
 plt.savefig(OUT_PDF, format='pdf', dpi=300, bbox_inches='tight', pad_inches=0.05)
+print('saved:', OUT_PDF)
 
 # Panel SRCC (largest |SRCC| over lag = -6..-1) is written to a CSV so that
 # table 1/table_1.py --verify can cross-check its own SRCC values against it.

@@ -3,12 +3,17 @@
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {'__pycache__', 'artifact'}
+# Leftovers that running the scripts (or an editor) leaves behind.
+JUNK_DIRS = {'__pycache__', '.pytest_cache', '.ipynb_checkpoints', '.vscode', '.idea'}
+JUNK_EXT = ('.pyc', '.pyo', '.pyw', '.orig', '.bak', '.rej', '~')
+JUNK_NAMES = {'.DS_Store', 'Thumbs.db', 'desktop.ini'}
 SAVE_RE = re.compile(r'\b(?:fig|plt|fig\d*)\.savefig\(')
 WRITE_RE = re.compile(r'\.to_csv\(|json\.dump\(|open\([^)]*[\'"][wa][\'"]\)')
 OUT_EXT = ('.pdf', '.png', '.csv')
@@ -72,6 +77,31 @@ def snapshot():
     return state
 
 
+# Delete caches and editor leftovers inside the package; returns what was removed.
+def clean():
+    removed = []
+    for root, dirs, files in os.walk(HERE, topdown=True):
+        for name in list(dirs):
+            if name not in JUNK_DIRS:
+                continue
+            path = os.path.join(root, name)
+            dirs.remove(name)
+            try:
+                shutil.rmtree(path)
+                removed.append(os.path.relpath(path, HERE) + os.sep)
+            except OSError as exc:
+                print('  ! cannot remove %s: %s' % (os.path.relpath(path, HERE), exc))
+        for name in files:
+            if name in JUNK_NAMES or name.lower().endswith(JUNK_EXT):
+                path = os.path.join(root, name)
+                try:
+                    os.remove(path)
+                    removed.append(os.path.relpath(path, HERE))
+                except OSError as exc:
+                    print('  ! cannot remove %s: %s' % (os.path.relpath(path, HERE), exc))
+    return sorted(removed)
+
+
 # CLI entry point: select the scripts, run them, report what they wrote.
 def main():
     ap = argparse.ArgumentParser(
@@ -90,7 +120,19 @@ def main():
                     help='also show the output of every script')
     ap.add_argument('--timeout', type=float, default=600.0,
                     help='per-script timeout in seconds')
+    ap.add_argument('--clean', action='store_true',
+                    help='only remove __pycache__/.vscode and other leftovers, then exit')
+    ap.add_argument('--no-clean', action='store_true',
+                    help='keep the leftovers instead of removing them after the run')
     args = ap.parse_args()
+
+    if args.clean:
+        print('cleaning temporary files under %s' % HERE)
+        junk = clean()
+        for path in junk:
+            print('  %s' % path)
+        print('%d item(s) removed.' % len(junk))
+        return 0
 
     plots, tables = discover()
     if args.paper_only:
@@ -181,6 +223,13 @@ def main():
     print('%d files written/updated:' % len(written))
     for w in written:
         print('  %s' % w)
+
+    if args.no_clean:
+        return 0 if ok_n == len(results) else 1
+    junk = clean()
+    print('\ncleaned %d temporary item(s):' % len(junk))
+    for path in junk:
+        print('  %s' % path)
     return 0 if ok_n == len(results) else 1
 
 

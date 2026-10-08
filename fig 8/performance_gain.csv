@@ -1,4 +1,4 @@
 benchmark,squanler_perf,second_best_method,second_best_perf,gain_percent
-media microservice,0.802718,PBScaler,0.658247,21.9478
-online boutique,0.749698,Microscaler,0.510476,46.8625
-sock shop,0.829046,PBScaler,0.762774,8.6883
+media microservice,0.798565,PBScaler,0.646498,23.5217
+online boutique,0.755472,Microscaler,0.504168,49.8453
+sock shop,0.802218,KHPA,0.727853,10.217
