@@ -17,7 +17,7 @@ OUT_CSV = os.path.join(HERE, "performance_gain.csv")
 
 TARGET_METHODS = [
     'Squanler',
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',

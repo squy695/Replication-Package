@@ -45,7 +45,7 @@ BENCHMARK_SERVICES = {
 }
 
 TARGET_METHODS = [
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',
@@ -54,7 +54,7 @@ TARGET_METHODS = [
 ]
 
 METHOD_LABELS = {
-    'Showar': 'SHOWAR',
+    'SHOWAR': 'SHOWAR',
     'Microscaler': 'Microscaler',
     'PBScaler': 'PBScaler',
     'Derm': 'Derm',

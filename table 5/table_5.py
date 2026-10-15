@@ -44,7 +44,7 @@ benchmark_services = {
 }
 
 BASELINES = [
-    ('RQ1', 'Showar', 'SHOWAR'),
+    ('RQ1', 'SHOWAR', 'SHOWAR'),
     ('RQ1', 'Microscaler', 'Microscaler'),
     ('RQ1', 'PBScaler', 'PBScaler'),
     ('RQ1', 'Derm', 'Derm'),

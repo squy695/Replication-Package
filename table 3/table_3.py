@@ -29,7 +29,7 @@ BENCHMARK_SERVICES = {
     ]
 }
 
-METHODS = ['Showar', 'Microscaler', 'PBScaler', 'Derm', 'KHPA', 'Squanler']
+METHODS = ['SHOWAR', 'Microscaler', 'PBScaler', 'Derm', 'KHPA', 'Squanler']
 
 COUNTEREXAMPLE_CELLS = {('media microservice', 'PBScaler')}
 
@@ -100,8 +100,13 @@ def calculate_performances(p90_series, count_series, conv_time, max_replicas, ma
     steady_perf = perf(float(np.mean(count_series[count_conv_idx:])),
                        float(np.mean(p90_series[p90_conv_idx:] > slo)))
 
+    # The paper's definition of the Perf change caused by Ambiguity (eq. for
+    # `Delta Perf^Ambiguity`): the Perf measured during convergence minus the
+    # steady-state Perf, weighted by the fraction of the run spent converging.
+    # Negative therefore means the autoscaler was worse before converging -- the
+    # usual case -- and the cells where it went the other way stay positive.
     time_weight = conv_time / TOTAL_MINUTES
-    delta_perf = float(np.maximum(0.0, (steady_perf - conv_perf) * time_weight))
+    delta_perf = float((conv_perf - steady_perf) * time_weight)
 
     return conv_perf, steady_perf, delta_perf
 
@@ -173,11 +178,14 @@ def main():
             if no_steady:
                 conv_str = steady_str = delta_str = '-- (No steady state)'
             elif raw_gap_list and (bm, method) in COUNTEREXAMPLE_CELLS:
-                raw_delta = float(np.mean(raw_gap_list)) * (conv_time / TOTAL_MINUTES)
+                # raw_gap_list stays steady - conv, because the test just above
+                # reads it in that order; only what is reported is flipped, to the
+                # paper's conv - steady. The std does not care about the sign.
+                raw_delta = -float(np.mean(raw_gap_list)) * (conv_time / TOTAL_MINUTES)
                 s = float(np.std([g * (conv_time / TOTAL_MINUTES) for g in raw_gap_list], ddof=1)) \
                     if len(raw_gap_list) > 1 else 0.0
                 delta_str = f"{raw_delta:.4f} ± {s:.4f}"
-                delta_list = [g * (conv_time / TOTAL_MINUTES) for g in raw_gap_list]
+                delta_list = [-g * (conv_time / TOTAL_MINUTES) for g in raw_gap_list]
             cell_lists[(bm, method)] = (list(conv_list), list(steady_list),
                                         bool(no_steady or steps_mean == 0))
 
@@ -218,7 +226,10 @@ def main():
                 conv_l, steady_l, skip = cell_lists.get((bm, method), ([], [], True))
                 if skip or not conv_l:
                     continue
-                raw = float(np.mean(steady_l)) - float(np.mean(conv_l))
+                # Same sign convention as the table above: conv - steady, i.e.
+                # negative for the usual case of being worse before converging.
+                # (The paired test and its p-values do not depend on the sign.)
+                raw = float(np.mean(conv_l)) - float(np.mean(steady_l))
                 p = pv.get(method, float('nan'))
                 hpv = hp.get(method, float('nan'))
                 stats_rows.append({'benchmark': bm, 'method': method, 'delta_perf': raw,

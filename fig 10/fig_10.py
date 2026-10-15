@@ -70,7 +70,7 @@ bm_styles = {
 convergence_times = {
     'sock shop': {
         'Squanler': 0.0,
-        'Showar': np.nan,
+        'SHOWAR': np.nan,
         'Microscaler': 5.2,
         'PBScaler': 3.2,
         'Derm': 0.6,
@@ -78,7 +78,7 @@ convergence_times = {
     },
     'online boutique': {
         'Squanler': 0.0,
-        'Showar': 2.4,
+        'SHOWAR': 2.4,
         'Microscaler': 7.1,
         'PBScaler': np.nan,
         'Derm': 0.4,
@@ -86,7 +86,7 @@ convergence_times = {
     },
     'media microservice': {
         'Squanler': 0.0,
-        'Showar': np.nan,
+        'SHOWAR': np.nan,
         'Microscaler': 4.9,
         'PBScaler': 6.4,
         'Derm': 5.3,
@@ -95,7 +95,7 @@ convergence_times = {
 }
 
 target_methods = [
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',
@@ -104,7 +104,7 @@ target_methods = [
 ]
 
 method_labels = {
-    'Showar': 'SHOWAR',
+    'SHOWAR': 'SHOWAR',
     'Microscaler': 'Microscaler',
     'PBScaler': 'PBScaler',
     'Derm': 'Derm',

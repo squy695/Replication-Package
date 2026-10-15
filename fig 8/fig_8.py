@@ -44,7 +44,7 @@ BENCHMARK_SERVICES = {
 
 TARGET_METHODS = [
     'Squanler',
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',
@@ -53,7 +53,7 @@ TARGET_METHODS = [
 
 METHOD_LABELS = {
     'Squanler': 'Squanler',
-    'Showar': 'SHOWAR',
+    'SHOWAR': 'SHOWAR',
     'Microscaler': 'Microscaler',
     'PBScaler': 'PBScaler',
     'Derm': 'Derm',
@@ -62,7 +62,7 @@ METHOD_LABELS = {
 
 METHOD_STYLES = {
     'Squanler': {'color': '#C85250', 'linestyle': '-',  'marker': 'D'},
-    'Showar':            {'color': '#4A71B0', 'linestyle': '--', 'marker': 's'},
+    'SHOWAR':            {'color': '#4A71B0', 'linestyle': '--', 'marker': 's'},
     'Microscaler':       {'color': '#8C8C8C', 'linestyle': '-.', 'marker': 'o'},
     'PBScaler':          {'color': '#8A6BA0', 'linestyle': '--', 'marker': '^'},
     'Derm':              {'color': '#8A924A', 'linestyle': ':',  'marker': '*'}

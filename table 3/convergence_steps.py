@@ -13,7 +13,7 @@ OUT_CSV = os.path.join(ROOT, 'table_3_steps.csv')
 
 BENCHMARKS = ['sock shop', 'online boutique', 'media microservice']
 WORKLOADS = ['workload 1', 'workload 2', 'workload 3']
-METHODS = ['Showar', 'Microscaler', 'PBScaler', 'Derm', 'KHPA', 'Squanler']
+METHODS = ['SHOWAR', 'Microscaler', 'PBScaler', 'Derm', 'KHPA', 'Squanler']
 RUNS = ['1', '2', '3', '4', '5']
 
 TOL_REL = 0.10          # ±10%

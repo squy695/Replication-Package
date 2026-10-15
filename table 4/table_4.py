@@ -33,7 +33,7 @@ benchmark_services = {
 }
 
 methods = [
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',

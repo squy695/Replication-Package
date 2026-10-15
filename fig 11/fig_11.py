@@ -49,7 +49,7 @@ bm_styles = {
 }
 
 target_methods = [
-    'Showar',
+    'SHOWAR',
     'Microscaler',
     'PBScaler',
     'Derm',
@@ -58,7 +58,7 @@ target_methods = [
 ]
 
 method_labels = {
-    'Showar': 'SHOWAR',
+    'SHOWAR': 'SHOWAR',
     'Microscaler': 'Microscaler',
     'PBScaler': 'PBScaler',
     'Derm': 'Derm',
