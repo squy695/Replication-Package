@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # Dependencies of the reviewer-facing image.
-#   pip install -r docker/requirements.txt
+#   pip install -r artifact/docker/requirements.txt
 # ---------------------------------------------------------------------------
 
 # Offline reproduction of every figure and table (run_all.py)

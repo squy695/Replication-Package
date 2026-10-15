@@ -98,7 +98,7 @@ class Config:
             'currencyservice', 'emailservice', 'paymentservice',
             'productcatalogservice', 'recommendationservice', 'shippingservice',
         ],
-        'interfaces': {},
+        'CCpR_matrix': {},
     }
 
     def __init__(self, config_file=None):
@@ -109,7 +109,7 @@ class Config:
         self._load_yaml(_env('SQUANLER_CONFIG') or config_file or self.DEFAULT_FILE)
         ccpr = _env('SQUANLER_CCPR')
         if ccpr:
-            self._load_yaml(ccpr, only=('interfaces', 'svcs'))
+            self._load_yaml(ccpr, only=('CCpR_matrix', 'svcs'))
         self._apply_env()
         self._normalize()
 
@@ -181,9 +181,9 @@ class Config:
         self.cycles = _as_list(self.cycles, ['2..', '302', '5..'])
         self.kubeconfig = self.kubeconfig or ''
 
-        self.interfaces = {
+        self.CCpR_matrix = {
             str(api): [list(row), _as_int(slo, self.SLO)]
-            for api, (row, slo) in (self.interfaces or {}).items()
+            for api, (row, slo) in (self.CCpR_matrix or {}).items()
         }
 
         # Prometheus label matchers for the entry point's metrics.
@@ -217,7 +217,7 @@ class Config:
             "  prometheus=%s\n"
             "  kubeconfig=%s"
             % (self.config_file or '<defaults+env>', self.namespace, self.ingress_namespace,
-               self.ingress, list(self.interfaces.keys()), self.SLO, self.AOL,
+               self.ingress, list(self.CCpR_matrix.keys()), self.SLO, self.AOL,
                self.scale_interval, self.duration, self.request, self.min_pod,
                self.max_pod, self.no_patch, self.dry_run,
                self.prom_no_range_url or '<unset>', self.kubeconfig or '<in-cluster>')

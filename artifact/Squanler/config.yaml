@@ -69,7 +69,7 @@ svcs:
   - recommendationservice
   - shippingservice
 
-# interfaces: API -> [CCpR row (millicores per request), SLO (ms)].
+# CCpR_matrix: API -> [CCpR row (millicores per request), SLO (ms)].
 # CCpR values are hardware dependent; to re-measure one API's row, inject
 # workload into that API, wait for it to stabilize, then query
 #   sum(rate(container_cpu_usage_seconds_total{namespace="hipster",
@@ -80,7 +80,7 @@ svcs:
 #       response_code!~"5.."}[90s]))
 # and store the resulting average at the index of that service. A whole matrix
 # can also be supplied with SQUANLER_CCPR=/path/to/matrix.yaml.
-interfaces:
+CCpR_matrix:
   "/ && GET": [[4.58, 0.58, 0.68, 0.15, 6.86, 0.40, 0.16, 0.47, 0.39, 0.21], 500]
   "/product/{id} && GET": [[8.42, 0.47, 1.06, 0.08, 4.35, 0.09, 1.9, 2.8, 2.5, 0.05], 500]
   "/cart && GET": [[7.23, 0.03, 1.23, 0.72, 3.24, 0.11, 1.1, 2.14, 2.14, 0.5], 500]

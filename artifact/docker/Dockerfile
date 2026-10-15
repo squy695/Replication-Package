@@ -1,16 +1,19 @@
 # ---------------------------------------------------------------------------
 # Reviewer-facing image.
 #
-#   docker build -t squanler-repro .
+#   docker build -f artifact/docker/Dockerfile -t squanler-repro .
 #   docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro   # all figures/tables
 #   docker run --rm -it squanler-repro shell                                # poke around
+#
+# Run the build from the package root: the build context is the whole package,
+# which is what COPY below relies on.
 #
 # The image contains no cluster credentials: the live mode mounts a kubeconfig
 # and talks to a cluster that the reviewer already has (see artifact/deploy/).
 # ---------------------------------------------------------------------------
 # The base image is a parameter so that it can be taken from a registry mirror
 # where Docker Hub is not reachable:
-#   docker build --build-arg BASE=docker.m.daocloud.io/library/python:3.9-slim -t squanler-repro .
+#   docker build -f artifact/docker/Dockerfile --build-arg BASE=docker.m.daocloud.io/library/python:3.9-slim -t squanler-repro .
 ARG BASE=python:3.9-slim
 FROM ${BASE}
 
@@ -62,12 +65,12 @@ RUN set -e; \
 
 WORKDIR /package
 
-COPY docker/requirements.txt /tmp/requirements.txt
+COPY artifact/docker/requirements.txt /tmp/requirements.txt
 RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt
 
 COPY . /package/
-RUN chmod +x /package/docker/entrypoint.sh /package/artifact/deploy/deploy.sh
+RUN chmod +x /package/artifact/docker/entrypoint.sh /package/artifact/deploy/deploy.sh
 
 WORKDIR /package
-ENTRYPOINT ["/package/docker/entrypoint.sh"]
+ENTRYPOINT ["/package/artifact/docker/entrypoint.sh"]
 CMD ["reproduce"]

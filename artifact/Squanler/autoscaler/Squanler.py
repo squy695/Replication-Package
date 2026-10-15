@@ -34,8 +34,8 @@ class Squanler:
         allocation = [0.0 for _ in self.config.svcs]
         rps_targets = {}
         for interface, workload in workloads.items():
-            ccp_r = self.config.interfaces[interface][0]
-            slo = self.config.interfaces[interface][1]
+            ccp_r = self.config.CCpR_matrix[interface][0]
+            slo = self.config.CCpR_matrix[interface][1]
             # Throughput that this workload implies if the SLO is to be met
             rps_targets[interface] = workload / (self.AOL + slo / 1000.0)
             for j in range(len(ccp_r)):

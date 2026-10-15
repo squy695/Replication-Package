@@ -4,7 +4,7 @@
 # through a port-forward started *inside* this container, so that the autoscaler
 # is a single `docker run` and nothing has to keep running on the host.
 #
-#   squanler-repro bash /package/docker/autoscale.sh
+#   squanler-repro bash /package/artifact/docker/autoscale.sh
 #
 # Environment: PROMETHEUS_URL (defaults to the forwarded localhost:9090),
 # SQUANLER_INGRESS_NAMESPACE (istio-system), SQUANLER_PROM_SERVICE (prometheus),

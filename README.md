@@ -3,7 +3,6 @@
 Artifacts, experimental data and the plotting/analysis scripts for the paper
 *Rethinking Metrics Quality for Microservice Autoscaling under Synchronous API Invocations*.
 
-
 ## Repository Layout
 
 Directories are named after what they reproduce: `fig i/` draws the paper's Fig *i*, `table i/` computes
@@ -41,12 +40,9 @@ Replication Package/
     ├── Squanler/              #   config.yaml, Config.py, main.py, autoscaler/, util/, requirements.txt
     ├── onlineboutique/        #   the benchmark: manifests, Istio Telemetry + WasmPlugin
     │   └── locust/workloads/  #   the injected load: one script + its wave per API (N.py, wiki/N.csv)
-    └── deploy/                #   deploy.sh (namespace -> Istio -> Prometheus -> app -> telemetry -> Locust)
+    ├── deploy/                #   deploy.sh (namespace -> Istio -> Prometheus -> app -> telemetry -> Locust)
+    └── docker/                #   the image: Dockerfile, entrypoint.sh, autoscale.sh, requirements.txt
 ```
-
-The package root also carries the image those commands run: `Dockerfile`, `docker/entrypoint.sh`
-(`reproduce` | `deploy` | `autoscale` | `load` | `shell`), `docker/autoscale.sh` and
-`docker/requirements.txt`.
 
 ## Benchmarks and Baselines
 
@@ -76,14 +72,14 @@ Everything runs inside the container this directory builds, so the host itself n
 * **Network access**, for the build and a first live run: about 3-4 GB in total, cached afterwards.
   Step 1 (the figures and tables) is fully offline. If a step hangs, or a pod stays in
   `ImagePullBackOff`, the images could not be pulled -- a network problem on your side (VPN, proxy,
-  registry mirror), not a problem with this package: the pods pull images themselves, so whatever lets
-  your browser reach the internet has to reach the container side too, and `docker pull redis:alpine`
-  on the host is a good smoke test.
+  registry mirror).
 * **A few GB of free RAM**, for the dozen pods of the live stack plus its Locust pairs.
 
-The image is built once from this directory, `docker build -t squanler-repro .`. The commands below are
-written for PowerShell and bash; in `cmd.exe`, write `%CD%` for `${PWD}` and `%USERPROFILE%` for
-`${HOME}`.
+The image is built once from this directory:
+`docker build -f artifact/docker/Dockerfile -t squanler-repro .`
+On Windows, run the commands below in PowerShell or WSL; on Linux and macOS, any shell works. They run as
+they are on Linux, because `--network host` is native there; on macOS they need Docker Desktop 4.34+ with
+*host networking* enabled.
 
 ## Quick start
 
@@ -93,10 +89,6 @@ written for PowerShell and bash; in `cmd.exe`, write `%CD%` for `${PWD}` and `%U
 docker run --rm -it -v "${PWD}/fig_and_table:/fig_and_table" squanler-repro
 ```
 
-One cosmetic note on that step: the scripts ask for Times New Roman, which this image does not ship (the
-font is not freely redistributable), so the figures come out set in DejaVu -- the same as the PDFs already
-in `fig_and_table/`. The data and the numbers are unaffected.
-
 **2. Deploy the cluster-side stack** -- namespace, Istio, Prometheus, Online Boutique, the per-API
 Telemetry/WasmPlugin and the Locust workload generator, on a local kind cluster:
 
@@ -104,17 +96,12 @@ Telemetry/WasmPlugin and the Locust workload generator, on a local kind cluster:
 docker run --rm -it --network host -v /var/run/docker.sock:/var/run/docker.sock -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config squanler-repro deploy --kind --scripts all
 ```
 
-**In Git Bash, prefix the command with `MSYS_NO_PATHCONV=1` and write the host-side mounts as `C:/...`:**
-Git Bash rewrites every path-like argument before docker sees them -- not just the socket, but also values
-such as `KUBECONFIG=/root/.kube/config`, and it turns the `:` of a `-v host:container` pair into a path
-separator. (PowerShell, cmd and WSL are not affected.)
-
 **3. Run Squanler** -- one decision block every 30 s, logged but not applied. The container starts its
 own Prometheus port-forward, so nothing has to keep running on the host; `SQUANLER_DRY_RUN=0` lets it
 patch the deployments:
 
 ```text
-docker run --rm -it --network host -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config -e SQUANLER_DRY_RUN=1 squanler-repro bash /package/docker/autoscale.sh
+docker run --rm -it --network host -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config -e SQUANLER_DRY_RUN=1 squanler-repro bash /package/artifact/docker/autoscale.sh
 ```
  
 **4. Remove everything again** -- the stack, the Locust pairs and the kind cluster:
@@ -136,12 +123,12 @@ never labelled a request, and the zeros that follow are not Squanler's fault.
 
 ## What a decision looks like
 
-Every control step prints the workload it reverse-quantified from the metrics, then the instance counts
+Every control step prints the workload it represented from the metrics, then the instance counts
 it derives from that workload:
 
 ```text
 === decision #1   14:54:18   SLO=500 ms  mode=dry-run ===
-  workload reverse-quantified from the metrics:
+  workload represented from the metrics:
     / && GET                 workload=41.43 (1s)   (=  27.62 req/s at the SLO)
     /product/{id} && GET     workload=24.92 (1s)   (=  16.61 req/s at the SLO)
     /cart && GET             workload=24.74 (1s)   (=  16.49 req/s at the SLO)
@@ -160,7 +147,7 @@ it derives from that workload:
     shippingservice              23.0 CPU-m / 150 m  ->    1 instance(s)
 ```
 
-A workload is quoted with the AOL it assumes -- `41.43 (1s)` is the same pressure as `20.72 (2s)`. With
+A workload is quoted with the AOL it assumes. With
 `SQUANLER_DRY_RUN=0`, `kubectl -n hipster get deploy -w` follows the instance column.
 
 ## Options
@@ -169,21 +156,13 @@ Append any of these to the `docker run ... deploy` command of *Quick start*:
 
 | Switch | Effect |
 |---|---|
-| `--kind` | create a local kind cluster first |
-| `--no-istio`, `--no-prometheus` | reuse what your cluster already runs |
-| `--scripts all` | inject into all five APIs, one Locust pair per API |
-| `--locust-script workloads/2.py` | inject into that API alone |
 | `--local-wasm` | serve the WasmPlugin module from inside the cluster |
 | `--dry-run` | print what would happen, change nothing |
-| `--teardown` | remove what this script created |
 
-`deploy` installs Istio 1.12 by default, because the two Istio manifests need
-`extensions.istio.io/v1alpha1` (WasmPlugin, not installed by 1.10) and `Telemetry.spec.metrics` (does not
-exist before 1.12). The WasmPlugin is attached to `istio-ingressgateway`, and its `.wasm` module is
-fetched from `storage.googleapis.com` at runtime, from inside the cluster; on a cluster without egress,
-`--local-wasm` serves the copy shipped here (`artifact/onlineboutique/wasm-server.Dockerfile`) instead.
-Finally, Istio's own addon Prometheus exposes `app` but no `namespace`; if you point Squanler at it, pass
-`-e SQUANLER_PROM_MATCH='app=istio-ingressgateway'`.
+`--local-wasm` is the one worth knowing: the plugin is a `.wasm` module that `wasmPlugin.yaml` fetches from
+`storage.googleapis.com` at runtime, from inside the cluster, so a cluster without egress gets no per-API
+labels at all -- and Squanler then reads zeros everywhere. `deploy` installs Istio 1.12 by default,
+because the WasmPlugin needs `extensions.istio.io/v1alpha1` and the Telemetry needs `Telemetry.spec.metrics`.
 
 ## Squanler's parameters
 
@@ -198,7 +177,7 @@ Every parameter is an environment variable, i.e. one more `-e NAME=value` on the
 | Run length | `duration` | `SQUANLER_DURATION` | `3600` s |
 | CPU request per instance | `request` | `SQUANLER_CPU_REQUEST` | `150` m |
 | Namespace / entry point | `namespace`, `ingress` | `SQUANLER_NAMESPACE`, `SQUANLER_INGRESS` | `hipster`, `istio-ingressgateway` |
-| CCpR matrix | `interfaces` | `SQUANLER_CCPR=/path/matrix.yaml` | measured on our cluster |
+| CCpR matrix | `CCpR_matrix` | `SQUANLER_CCPR=/path/matrix.yaml` | measured on our cluster |
 | Prometheus endpoint | `prometheus_url` | `PROMETHEUS_URL` | `http://prometheus.istio-system:9090` |
 | Label matchers of the entry point | `prom_match` | `SQUANLER_PROM_MATCH` | `app=<ingress>` |
 | Cluster credentials | `kubeconfig` | `KUBECONFIG` | in-cluster service account |
@@ -206,4 +185,4 @@ Every parameter is an environment variable, i.e. one more `-e NAME=value` on the
 
 `SQUANLER_DRY_RUN=1` logs every decision without patching a single Deployment -- the quickest way to check
 that Prometheus and the CCpR matrix line up on your cluster. The CCpR matrix in `config.yaml` was measured
-on our hardware; re-measuring it takes about `2 x |API|` minutes, as described in that file.
+on our hardware; for an allocation that matches your own cluster, re-measure it as described in the paper.

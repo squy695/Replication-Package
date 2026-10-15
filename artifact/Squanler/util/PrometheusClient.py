@@ -42,7 +42,7 @@ class PrometheusClient:
         return response.json()["data"]["result"]
 
     def get_workload(self, AOL):
-        res = {i:{c:[0, 0] for c in self.config.cycles} for i in self.config.interfaces.keys()}
+        res = {i:{c:[0, 0] for c in self.config.cycles} for i in self.config.CCpR_matrix.keys()}
         interval = '60s'
 
         # Label matchers of the entry point's metrics: configurable, because the
@@ -53,7 +53,7 @@ class PrometheusClient:
         )
         selector = (selector + ',') if selector else ''
 
-        for i in self.config.interfaces.keys():
+        for i in self.config.CCpR_matrix.keys():
 
             for c in self.config.cycles:
                 # Query RPS (requests per second)
