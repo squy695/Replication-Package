@@ -13,9 +13,12 @@ import math
 from matplotlib.lines import Line2D
 
 # Scientific plot configuration
+# Overall scaling factor for the in-figure text (so that in print it matches fig_SRCC).
+FS_SCALE = 1.30
+
 rcParams['font.family'] = 'Times New Roman'
 # Figure style (matplotlib rcParams).
-rcParams['font.size'] = 14
+rcParams['font.size'] = 14 * FS_SCALE
 rcParams['axes.labelweight'] = 'bold'
 rcParams['axes.linewidth'] = 1.2
 
@@ -96,15 +99,17 @@ cbar.set_ticklabels([f"{inverse_transform(t):.0f}" for t in ticks])
 cbar.minorticks_off()
 
 # Axis labeling and tick formatting
-ax.set_xlabel('Workload', fontsize=16, labelpad=10)
-ax.set_ylabel('Instance Count', fontsize=16, labelpad=10)
+ax.set_xlabel('Workload intensity', fontsize=16 * FS_SCALE, labelpad=10)
+ax.set_ylabel('Instance Count', fontsize=16 * FS_SCALE, labelpad=10)
 # Z-axis label: keep it reading bottom-up (mplot3d auto-rotates it the other way round).
 ax.zaxis.set_rotate_label(False)
-ax.set_zlabel('   RPS   ', rotation=90, fontsize=16, labelpad=10)
+ax.set_zlabel('   RPS   ', rotation=90, fontsize=16 * FS_SCALE, labelpad=10)
 
 # X-axis ticks (restore from power transform)
 ax.set_xticks(range(0, 16, 2))
-ax.set_xticklabels([str(int(np.power(i, 1/base))) for i in range(0, 16, 2)])
+# With the larger font, the 3D Workload axis ticks would collide, so label every other one
+ax.set_xticklabels([str(int(np.power(i, 1/base))) if j % 2 == 0 else ''
+                    for j, i in enumerate(range(0, 16, 2))])
 
 # Y-axis ticks (log-scale labels)
 ax.set_yticks(np.arange(len(counts) + 1))
@@ -130,16 +135,16 @@ for axis in [ax.xaxis, ax.yaxis, ax.zaxis]:
 # View angle and Legend
 ax.view_init(elev=12, azim=215)
 custom_lines = [
-    Line2D([0], [0], marker='o', color='w', label='Return with HTTP code 200', markerfacecolor='black', markersize=8),
-    Line2D([0], [0], marker='^', color='w', label='Return with HTTP code 500', markerfacecolor='black', markersize=8)
+    Line2D([0], [0], marker='o', color='w', label='HTTP 200', markerfacecolor='black', markersize=8),
+    Line2D([0], [0], marker='^', color='w', label='HTTP 500', markerfacecolor='black', markersize=8)
 ]
 fig.legend(handles=custom_lines, loc='lower center', bbox_to_anchor=(0.58, 0.72), 
-           ncol=2, frameon=False, fontsize=18, handletextpad=0.02, columnspacing=0.5)
+           ncol=2, frameon=False, fontsize=18 * FS_SCALE, handletextpad=0.02, columnspacing=1.6)
 
 def phase_label(text, xy):
     """One phase label, placed in figure coordinates."""
     label = fig.text(xy[0], xy[1], text, ha='center', va='center',
-                     fontsize=16, fontweight='bold', color='black')
+                     fontsize=16 * FS_SCALE, fontweight='bold', color='black')
     label.set_in_layout(False)
 
 

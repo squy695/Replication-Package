@@ -1,0 +1,522 @@
+# Workload injection, all five APIs at once (deploy.sh --scripts all).
+#
+# Locust requires every worker of a master to run the *same* locustfile, and each
+# bundled script drives exactly one API (workloads/1.py -> "/ && GET", 2.py ->
+# "/product/{id}", 3.py -> "/cart", 4.py -> "/cart/checkout", 5.py ->
+# "/setCurrency"). Feeding all five APIs therefore takes five independent master
+# + worker pairs, one per API, each replaying its own wave -- which is how the
+# paper injects its workload and what the sample decision block in the README
+# was produced with.
+#
+# deploy.sh creates the five ConfigMaps (locust-scripts-1 .. locust-scripts-5);
+# every pair mounts its own into /mnt/locust/workloads/, so the scripts find their
+# wave next to themselves, exactly as workloads/N.py expects.
+#
+# One worker per API is deliberate: each wave peaks at 45 users, and a single
+# worker serves that comfortably. Scale up with
+#   kubectl -n hipster scale deploy/locust-worker-N --replicas=4
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-1
+  labels:
+    app: locust-master-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master-1
+  template:
+    metadata:
+      labels:
+        app: locust-master-1
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/1.py
+            - --master
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-1
+            items:
+              - key: script
+                path: workloads/1.py
+              - key: wave
+                path: workloads/wiki/1.csv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master-1
+  labels:
+    app: locust-master-1
+spec:
+  selector:
+    app: locust-master-1
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker-1
+  labels:
+    app: locust-worker-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-worker-1
+  template:
+    metadata:
+      labels:
+        app: locust-worker-1
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/1.py
+            - --worker
+            - --master-host
+            - locust-master-1
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-1
+            items:
+              - key: script
+                path: workloads/1.py
+              - key: wave
+                path: workloads/wiki/1.csv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-2
+  labels:
+    app: locust-master-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master-2
+  template:
+    metadata:
+      labels:
+        app: locust-master-2
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/2.py
+            - --master
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-2
+            items:
+              - key: script
+                path: workloads/2.py
+              - key: wave
+                path: workloads/wiki/2.csv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master-2
+  labels:
+    app: locust-master-2
+spec:
+  selector:
+    app: locust-master-2
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker-2
+  labels:
+    app: locust-worker-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-worker-2
+  template:
+    metadata:
+      labels:
+        app: locust-worker-2
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/2.py
+            - --worker
+            - --master-host
+            - locust-master-2
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-2
+            items:
+              - key: script
+                path: workloads/2.py
+              - key: wave
+                path: workloads/wiki/2.csv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-3
+  labels:
+    app: locust-master-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master-3
+  template:
+    metadata:
+      labels:
+        app: locust-master-3
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/3.py
+            - --master
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-3
+            items:
+              - key: script
+                path: workloads/3.py
+              - key: wave
+                path: workloads/wiki/3.csv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master-3
+  labels:
+    app: locust-master-3
+spec:
+  selector:
+    app: locust-master-3
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker-3
+  labels:
+    app: locust-worker-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-worker-3
+  template:
+    metadata:
+      labels:
+        app: locust-worker-3
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/3.py
+            - --worker
+            - --master-host
+            - locust-master-3
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-3
+            items:
+              - key: script
+                path: workloads/3.py
+              - key: wave
+                path: workloads/wiki/3.csv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-4
+  labels:
+    app: locust-master-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master-4
+  template:
+    metadata:
+      labels:
+        app: locust-master-4
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/4.py
+            - --master
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-4
+            items:
+              - key: script
+                path: workloads/4.py
+              - key: wave
+                path: workloads/wiki/4.csv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master-4
+  labels:
+    app: locust-master-4
+spec:
+  selector:
+    app: locust-master-4
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker-4
+  labels:
+    app: locust-worker-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-worker-4
+  template:
+    metadata:
+      labels:
+        app: locust-worker-4
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/4.py
+            - --worker
+            - --master-host
+            - locust-master-4
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-4
+            items:
+              - key: script
+                path: workloads/4.py
+              - key: wave
+                path: workloads/wiki/4.csv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-5
+  labels:
+    app: locust-master-5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master-5
+  template:
+    metadata:
+      labels:
+        app: locust-master-5
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/5.py
+            - --master
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-5
+            items:
+              - key: script
+                path: workloads/5.py
+              - key: wave
+                path: workloads/wiki/5.csv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master-5
+  labels:
+    app: locust-master-5
+spec:
+  selector:
+    app: locust-master-5
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker-5
+  labels:
+    app: locust-worker-5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-worker-5
+  template:
+    metadata:
+      labels:
+        app: locust-worker-5
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/workloads/5.py
+            - --worker
+            - --master-host
+            - locust-master-5
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts-5
+            items:
+              - key: script
+                path: workloads/5.py
+              - key: wave
+                path: workloads/wiki/5.csv

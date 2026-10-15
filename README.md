@@ -3,8 +3,50 @@
 Artifacts, experimental data and the plotting/analysis scripts for the paper
 *Rethinking Metrics Quality for Microservice Autoscaling under Synchronous API Invocations*.
 
-Directories are named after what they reproduce: `fig i/` draws the paper's Fig *i*, `table i/`
-computes Table *i*, and every experiment's raw traces live once under `data/`.
+
+## Repository Layout
+
+Directories are named after what they reproduce: `fig i/` draws the paper's Fig *i*, `table i/` computes
+Table *i*, and every experiment's raw traces live once under `data/`.
+
+```text
+Replication Package/
+├── run_all.py                 # run every plotting script in one go
+├── stats_utils.py             # shared statistics helpers (Holm correction, paired t-test, ...)
+│
+├── fig_and_table/             # every generated figure and table (the output of step 1)
+│
+├── fig 2/   fig_2.py                               # Fig 2      -> fig_workload_ambiguity.pdf
+├── fig 3/   fig_3a.py fig_3b.py fig_3c.py  data/   # Fig 3a/b/c -> fig_motivation_1_a/b/c.pdf
+├── fig 4/   fig_4a.py fig_4b.py fig_4c.py  data/   # Fig 4a/b/c -> fig_motivation_2_a/b/c.pdf
+├── fig 5/   fig_5.py                               # Fig 5      -> fig_SRCC.pdf + fig_SRCC.png
+├── fig 7/   fig_7.py                               # Fig 7      -> fig_RQ1.pdf
+├── fig 8/   fig_8.py performance_gain.py           # Fig 8      -> fig_RQ1_alpha.pdf
+├── fig 9/   fig_9.py                               # Fig 9      -> fig_RQ2.pdf
+├── fig 10/  fig_10.py                              # Fig 10     -> fig_RQ3_1.pdf
+├── fig 11/  fig_11.py                              # Fig 11     -> fig_RQ3_2.pdf
+├── fig 13/  fig_13.py                              # Fig 13     -> fig_RQ4_alloc.pdf
+├── RQ4/     fig_RQ4_function.py                    # Fig 12     -> fig_RQ4_function.pdf
+├── table 1/ .. table 5/                            # Table 1..5 -> table_*.csv, written in place
+│
+├── data/                      # the only copy of the experimental data
+│   ├── motivation/            #   actual workload/ (API1..API5) + metric-represented workload/ (5 signals), 60-min run
+│   ├── rq1/                   #   <benchmark>/<method>/<run>/{count,p90}.csv (+ workload/)
+│   ├── rq2/                   #   same layout + variants/ (metric-fed variants replayed from the traces)
+│   ├── rq3_1/                 #   <benchmark>/<method>/<run>/ + workload 1..3/ (three injected workloads)
+│   ├── rq3_2/                 #   <benchmark>/<method>/<run>/{count,p90}.csv (noise injection)
+│   └── rq4/                   #   <benchmark>/Squanler {Exact,Low,High} AOL/<run>/{count,p90}.csv
+│
+└── artifact/                  # deployment artifacts
+    ├── Squanler/              #   config.yaml, Config.py, main.py, autoscaler/, util/, requirements.txt
+    ├── onlineboutique/        #   the benchmark: manifests, Istio Telemetry + WasmPlugin
+    │   └── locust/workloads/  #   the injected load: one script + its wave per API (N.py, wiki/N.csv)
+    └── deploy/                #   deploy.sh (namespace -> Istio -> Prometheus -> app -> telemetry -> Locust)
+```
+
+The package root also carries the image those commands run: `Dockerfile`, `docker/entrypoint.sh`
+(`reproduce` | `deploy` | `autoscale` | `load` | `shell`), `docker/autoscale.sh` and
+`docker/requirements.txt`.
 
 ## Benchmarks and Baselines
 
@@ -26,112 +68,142 @@ Baselines (see `refs.bib` in the manuscript sources):
 | Derm | Chen et al., *Derm: SLA-aware resource management for highly dynamic microservices*, ISCA 2024 | `chen2024derm` |
 | KHPA | Cloud Native Computing Foundation, *Horizontal Pod Autoscaler*, Kubernetes documentation, 2025 | `KubernetesHPA` |
 
-## Repository Layout
+## Requirements
+
+Everything runs inside the container this directory builds, so the host itself needs only:
+
+* **Docker**, installed and running.
+* **Network access**, for the build and a first live run: about 3-4 GB in total, cached afterwards.
+  Step 1 (the figures and tables) is fully offline. If a step hangs, or a pod stays in
+  `ImagePullBackOff`, the images could not be pulled -- a network problem on your side (VPN, proxy,
+  registry mirror), not a problem with this package: the pods pull images themselves, so whatever lets
+  your browser reach the internet has to reach the container side too, and `docker pull redis:alpine`
+  on the host is a good smoke test.
+* **A few GB of free RAM**, for the dozen pods of the live stack plus its Locust pairs.
+
+The image is built once from this directory, `docker build -t squanler-repro .`. The commands below are
+written for PowerShell and bash; in `cmd.exe`, write `%CD%` for `${PWD}` and `%USERPROFILE%` for
+`${HOME}`.
+
+## Quick start
+
+**1. Draw every figure and table** (~2.5 min, Docker only). The results land in `fig_and_table/`:
 
 ```text
-Replication Package/
-├── run_all.py                 # run every plotting script in one go
-├── stats_utils.py             # shared statistics helpers (Holm correction, paired t-test, …)
-│
-├── fig 3/   fig_3a.py fig_3b.py fig_3c.py  data/   # Fig 3a/b/c → fig_motivation_1_a/b/c.pdf
-├── fig 4/   fig_4a.py fig_4b.py fig_4c.py  data/   # Fig 4a/b/c → fig_motivation_2_a/b/c.pdf
-├── fig 5/   fig_5.py                               # Fig 5      → fig_SRCC.pdf + fig_SRCC.png
-├── fig 7/   fig_7a.py fig_7b.py                    # Fig 7a/b   → fig_RQ1_count.pdf, fig_RQ1_p90.pdf
-├── fig 8/   fig_8.py performance_gain.py           # Fig 8      → fig_RQ1_alpha.pdf
-├── fig 9/   fig_9.py                               # Fig 9      → fig_RQ2.pdf
-├── fig 10/  fig_10.py                              # Fig 10     → fig_RQ3_1.pdf
-├── fig 11/  fig_11.py                              # Fig 11     → fig_RQ3_2.pdf
-├── fig 13/  fig_13.py                              # Fig 13     → fig_RQ4_alloc.pdf
-│
-├── data/                      # the only copy of the experimental data (see "Data Reuse" below)
-│   ├── motivation/            #   actual workload/ (API1..API5) + metric-quantified workload/ (5 signals), 60-min run
-│   ├── rq1/                   #   <benchmark>/<method>/<run>/{count,p90}.csv (+ workload/)
-│   ├── rq2/                   #   same layout + variants/ (metric-fed variants replayed from the traces)
-│   ├── rq3_1/                 #   <benchmark>/<method>/<run>/ + workload 1..3/ (three injected workloads)
-│   ├── rq3_2/                 #   <benchmark>/<method>/<run>/{count,p90}.csv (noise injection)
-│   └── rq4/                   #   <benchmark>/Squanler {Exact,Low,High} AOL/<run>/{count,p90}.csv
-│
-└── artifact/                  # deployment artifacts
-    ├── Squanler/              #   Config.py, main.py, autoscaler/, util/, admin.conf, requirements.txt
-    └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
+docker run --rm -it -v "${PWD}/fig_and_table:/fig_and_table" squanler-repro
 ```
 
-## Data Reuse
+One cosmetic note on that step: the scripts ask for Times New Roman, which this image does not ship (the
+font is not freely redistributable), so the figures come out set in DejaVu -- the same as the PDFs already
+in `fig_and_table/`. The data and the numbers are unaffected.
 
-Several experiments read the *same* raw traces from more than one place instead of re-running them.
-`data/` holds 1,240 CSVs with 924 unique contents; the remaining 316 files are deliberate copies:
+**2. Deploy the cluster-side stack** -- namespace, Istio, Prometheus, Online Boutique, the per-API
+Telemetry/WasmPlugin and the Locust workload generator, on a local kind cluster:
 
-| Original | Copies | Why |
-|----------|--------|-----|
-| `rq1/<bm>/{Showar,Microscaler,PBScaler,Derm,KHPA}/<run>/{count,p90}.csv` | `rq2/<bm>/<baseline>/<run>/…` (150 files) | RQ2 replays the RQ1 baseline traces through the metric-fed variants; the baselines themselves are not re-executed |
-| `rq1/<bm>/workload/wiki*.csv` | `rq2/<bm>/workload/wiki*.csv` (16 files) | RQ1 and RQ2 are driven by the same injected workload; `wiki 1.csv` is additionally shared between Media Microservice and Online Boutique |
-| `rq1/<bm>/Squanler/<run>/{count,p90}.csv` | `rq2/<bm>/Squanler/<run>/…` and `rq4/<bm>/Squanler Exact AOL/<run>/…` (each trace appears 3×) | Exact AOL *is* the unmodified Squanler; RQ4 only perturbs the AOL estimate and reuses the RQ1 run as its own baseline |
-| `rq3_1/<bm>/workload 1/<method>/<run>/count.csv` | `rq3_1/<bm>/<method>/<run>/count.csv` (90 files) | the top-level directory *is* workload 1; only `count.csv` is copied, each `p90.csv` is a separate run |
-
-Consequences when replicating:
-
-- Squanler (RQ1) and Squanler Exact AOL (RQ4) are **five runs, not ten**. The three AOL variants are
-  compared over the same five repetitions, paired per run (`table 5/table_5.py`).
-- RQ2 variant numbers come from replaying one baseline execution, so their allocations and their
-  latency series do not come from the same execution.
-- In `rq3_1`, workload 1 and the top-level directory must not be read as two independent workloads.
-
-## Sampling-Window Alignment
-
-Collection of the latency series was stopped by hand, so runs of the same benchmark end with
-different numbers of samples. Every `p90.csv` is aligned to the shortest run of its benchmark,
-rounded *down* to hundreds, keeping the first `N` data rows; `count.csv` is not modified.
-
-| Data | Benchmark | Shortest run | Rows kept (`N`) |
-|------|-----------|--------------|-----------------|
-| `rq1`, `rq2`, `rq4` | Media Microservice | 1119 | **1100** |
-| `rq1`, `rq2`, `rq4` | Online Boutique | 1225 | **1200** |
-| `rq1`, `rq2`, `rq4` | Sock Shop | 970 | **900** |
-| `rq2/variants` | all three | — | 1200 already, unchanged |
-| `rq3_1`, `rq3_2` | all three | — | 299 already, unchanged |
-
-The three groups that share traces are aligned together, so a Squanler run stays byte-identical
-across `rq1`, `rq2` and `rq4`. Pre-alignment copies of every modified file are kept outside the
-package (see the backup path printed by the alignment step).
-
-## Running
-
-`run_all.py` runs everything.
-
-```bash
-python run_all.py                 # all 21 scripts (~2 min)
-python run_all.py --plots-only    # the 14 figures only
-python run_all.py --tables-only   # the 7 table/analysis scripts only
-python run_all.py --list          # list what would run; --only "fig 7" filters by path
-python run_all.py --verbose       # print each script's console output
-python run_all.py --clean         # only remove the leftovers, then exit
-python run_all.py --no-clean      # run everything but keep the leftovers
+```text
+docker run --rm -it --network host -v /var/run/docker.sock:/var/run/docker.sock -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config squanler-repro deploy --kind --scripts all
 ```
 
-After a run, `__pycache__/`, `*.pyc`, `*.orig`, `*.bak`, `*.rej`, `*~`, `.pytest_cache/`,
-`.ipynb_checkpoints/`, `.vscode/`, `.idea/`, `.DS_Store`, `Thumbs.db` and `desktop.ini` inside the
-package are deleted and listed at the end of the summary; `--clean` performs only that cleanup,
-`--no-clean` skips it.
+**In Git Bash, prefix the command with `MSYS_NO_PATHCONV=1` and write the host-side mounts as `C:/...`:**
+Git Bash rewrites every path-like argument before docker sees them -- not just the socket, but also values
+such as `KUBECONFIG=/root/.kube/config`, and it turns the `:` of a `-v host:container` pair into a path
+separator. (PowerShell, cmd and WSL are not affected.)
 
-Every script resolves its inputs relative to its own location and can also be launched on its own:
+**3. Run Squanler** -- one decision block every 30 s, logged but not applied. The container starts its
+own Prometheus port-forward, so nothing has to keep running on the host; `SQUANLER_DRY_RUN=0` lets it
+patch the deployments:
 
-```bash
-python "table 1/table_1.py" --verify   # Table 1, cross-checking fig 5/srcc_panels.csv
-python "table 1/table_1.py" --tex table1.tex
+```text
+docker run --rm -it --network host -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config -e SQUANLER_DRY_RUN=1 squanler-repro bash /package/docker/autoscale.sh
+```
+ 
+**4. Remove everything again** -- the stack, the Locust pairs and the kind cluster:
+
+```text
+docker run --rm -it --network host -v /var/run/docker.sock:/var/run/docker.sock -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config squanler-repro deploy --kind --teardown
 ```
 
-## Experimental Environment
+**Sanity check.** Traffic must enter **through the gateway** for the per-API labels to exist. Give the
+workload generator ~30 s, then run the port-forward in one terminal and the query in another:
 
-Docker 27.5.1+, Kubernetes v1.20.4 and Istio v1.10, with Prometheus collecting per-API latency and
-RPS (Istio Telemetry + WasmPlugin); the custom test-bed apps are built from
-`artifact/testbed_application/`. Squanler runs inside the cluster:
-
-```bash
-cd artifact/Squanler
-pip install -r requirements.txt       # Python 3.9
-# point admin.conf at your cluster, then set the runtime parameters in Config.py
-python main.py
+```text
+kubectl -n istio-system port-forward svc/prometheus 9090:9090
+curl -s -G --data-urlencode 'query=count by (request_operation) (istio_request_duration_milliseconds_count)' http://localhost:9090/api/v1/query
 ```
 
-If the configuration is correct, tail latency drops across all APIs. The benchmark deployment
-manifests and the Locust workload-injection scripts are not shipped in this package.
+Five entries such as `"/ && GET"` and `"/cart && POST"` are expected; an empty list means the WasmPlugin
+never labelled a request, and the zeros that follow are not Squanler's fault.
+
+## What a decision looks like
+
+Every control step prints the workload it reverse-quantified from the metrics, then the instance counts
+it derives from that workload:
+
+```text
+=== decision #1   14:54:18   SLO=500 ms  mode=dry-run ===
+  workload reverse-quantified from the metrics:
+    / && GET                 workload=41.43 (1s)   (=  27.62 req/s at the SLO)
+    /product/{id} && GET     workload=24.92 (1s)   (=  16.61 req/s at the SLO)
+    /cart && GET             workload=24.74 (1s)   (=  16.49 req/s at the SLO)
+    /setCurrency && POST     workload=14.43 (1s)   (=   9.62 req/s at the SLO)
+    /cart/checkout && POST   workload=13.11 (1s)   (=   8.74 req/s at the SLO)
+  allocation (service -> instances):
+    frontend                    540.4 CPU-m / 150 m  ->    4 instance(s)
+    adservice                    25.1 CPU-m / 150 m  ->    1 instance(s)
+    cartservice                 105.3 CPU-m / 150 m  ->    1 instance(s)
+    checkoutservice             238.8 CPU-m / 150 m  ->    2 instance(s)
+    currencyservice             592.2 CPU-m / 150 m  ->    4 instance(s)
+    emailservice                 35.3 CPU-m / 150 m  ->    1 instance(s)
+    paymentservice               58.7 CPU-m / 150 m  ->    1 instance(s)
+    productcatalogservice       127.8 CPU-m / 150 m  ->    1 instance(s)
+    recommendationservice       198.4 CPU-m / 150 m  ->    2 instance(s)
+    shippingservice              23.0 CPU-m / 150 m  ->    1 instance(s)
+```
+
+A workload is quoted with the AOL it assumes -- `41.43 (1s)` is the same pressure as `20.72 (2s)`. With
+`SQUANLER_DRY_RUN=0`, `kubectl -n hipster get deploy -w` follows the instance column.
+
+## Options
+
+Append any of these to the `docker run ... deploy` command of *Quick start*:
+
+| Switch | Effect |
+|---|---|
+| `--kind` | create a local kind cluster first |
+| `--no-istio`, `--no-prometheus` | reuse what your cluster already runs |
+| `--scripts all` | inject into all five APIs, one Locust pair per API |
+| `--locust-script workloads/2.py` | inject into that API alone |
+| `--local-wasm` | serve the WasmPlugin module from inside the cluster |
+| `--dry-run` | print what would happen, change nothing |
+| `--teardown` | remove what this script created |
+
+`deploy` installs Istio 1.12 by default, because the two Istio manifests need
+`extensions.istio.io/v1alpha1` (WasmPlugin, not installed by 1.10) and `Telemetry.spec.metrics` (does not
+exist before 1.12). The WasmPlugin is attached to `istio-ingressgateway`, and its `.wasm` module is
+fetched from `storage.googleapis.com` at runtime, from inside the cluster; on a cluster without egress,
+`--local-wasm` serves the copy shipped here (`artifact/onlineboutique/wasm-server.Dockerfile`) instead.
+Finally, Istio's own addon Prometheus exposes `app` but no `namespace`; if you point Squanler at it, pass
+`-e SQUANLER_PROM_MATCH='app=istio-ingressgateway'`.
+
+## Squanler's parameters
+
+Every parameter is an environment variable, i.e. one more `-e NAME=value` on the `autoscale` command of
+*Quick start*; `artifact/Squanler/config.yaml` holds the same parameters with their defaults:
+
+| Parameter | `config.yaml` key | Environment variable | Default |
+|---|---|---|---|
+| Average outside latency | `AOL` | `SQUANLER_AOL` | `1.0` s |
+| Target end-to-end latency | `SLO` | `SQUANLER_SLO` | `500` ms |
+| Decision interval | `scale_interval` | `SQUANLER_INTERVAL` | `30` s |
+| Run length | `duration` | `SQUANLER_DURATION` | `3600` s |
+| CPU request per instance | `request` | `SQUANLER_CPU_REQUEST` | `150` m |
+| Namespace / entry point | `namespace`, `ingress` | `SQUANLER_NAMESPACE`, `SQUANLER_INGRESS` | `hipster`, `istio-ingressgateway` |
+| CCpR matrix | `interfaces` | `SQUANLER_CCPR=/path/matrix.yaml` | measured on our cluster |
+| Prometheus endpoint | `prometheus_url` | `PROMETHEUS_URL` | `http://prometheus.istio-system:9090` |
+| Label matchers of the entry point | `prom_match` | `SQUANLER_PROM_MATCH` | `app=<ingress>` |
+| Cluster credentials | `kubeconfig` | `KUBECONFIG` | in-cluster service account |
+| Safety knobs | `no_patch`, `dry_run` | `SQUANLER_NO_PATCH`, `SQUANLER_DRY_RUN` | `[]`, `false` |
+
+`SQUANLER_DRY_RUN=1` logs every decision without patching a single Deployment -- the quickest way to check
+that Prometheus and the CCpR matrix line up on your cluster. The CCpR matrix in `config.yaml` was measured
+on our hardware; re-measuring it takes about `2 x |API|` minutes, as described in that file.

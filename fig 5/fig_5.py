@@ -13,7 +13,12 @@ from scipy.stats import spearmanr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 F7 = os.path.join(HERE, '..', 'data', 'motivation')
-OUT_PDF = os.path.join(os.path.dirname(HERE), 'fig_SRCC.pdf')
+
+# FIG5_ANNOT=0 exports the same figure WITHOUT the red annotation (dashed frame, elbow arrow
+# and its label), so that they can be drawn by hand in an external editor (draw.io) and the
+# final artwork re-exported. That run writes fig_SRCC_nored.pdf and fig_SRCC_nored.svg.
+ANNOT = os.environ.get('FIG5_ANNOT', '1') != '0'
+OUT_PDF = os.path.join(os.path.dirname(HERE), 'fig_SRCC%s.pdf' % ('' if ANNOT else '_nored'))
 
 PNG_DPI = 300          # resolution of the raster copy (dots per inch)
 
@@ -23,7 +28,7 @@ MAX_LAG = 6
 GT_SMOOTH_WINDOW = 5
 
 QUANT_SMOOTH_WINDOW = 8
-QUANT_SMOOTH_FILES = {'our quantified workload.csv'}
+QUANT_SMOOTH_FILES = {'our represented workload.csv'}
 
 # Figure style (matplotlib rcParams).
 rcParams['font.family'] = 'Times New Roman'
@@ -45,11 +50,11 @@ API_STYLES = [
 # Panel order: the four traditional signals fill the first two columns, while the third
 # column groups the two workload panels (ours on top, the ground truth below).
 PANELS = [
-    ('Latency with HTTP 200',                 'quant',  'latency 200.csv', 0, 0),
-    ('Latency with HTTP 500',                 'quant',  'latency 500.csv', 0, 0),
-    ('Our quantified workload',    'quant',  'our quantified workload.csv',  10, 10),
-    ('RPS with HTTP 200',                          'quant',  'RPS 200.csv',        0, 0),
-    ('RPS with HTTP 500',                          'quant',  'RPS 500.csv',        0, 0),
+    ('Latency (HTTP 200)',                 'quant',  'latency 200.csv', 0, 0),
+    ('Latency (HTTP 500)',                 'quant',  'latency 500.csv', 0, 0),
+    ('Our represented workload',    'quant',  'our represented workload.csv',  10, 10),
+    ('RPS (HTTP 200)',                          'quant',  'RPS 200.csv',        0, 0),
+    ('RPS (HTTP 500)',                          'quant',  'RPS 500.csv',        0, 0),
     ('Ground-truth workload',      'actual', None,                      0, 0),
 ]
 
@@ -68,7 +73,7 @@ def load_panel(kind, fname, smooth=False):
                                          min_periods=1).mean().to_numpy()
             out[key] = v
         else:
-            p = os.path.join(F7, 'metric-quantified workload', fname)
+            p = os.path.join(F7, 'metric-represented workload', fname)
             if not os.path.exists(p):
                 continue
             d = pd.read_csv(p).fillna(0)
@@ -184,23 +189,40 @@ fig.add_artist(Rectangle((box_x0, box_y0), box_x1 - box_x0, box_y1 - box_y0,
                          linewidth=4.5, linestyle=(0, (7, 5)), zorder=30))
 
 target = axes[0, 2].get_position()
-elbow_y = by1 + 0.102 * bh                                     # horizontal run, above the panels
+elbow_y = by1 + 0.114 * bh                                     # horizontal run, above the panels
 run_x0 = bx1 - 0.0663 * bw                                     # its left end, above panel 2
 vert_x = target.x0 + 0.122 * target.width                      # drop lands in panel 3, near its left
 fig.add_artist(Line2D([run_x0, vert_x], [elbow_y, elbow_y], transform=fig.transFigure,
                       color=ANNOT_COLOR, linewidth=6, zorder=30, solid_capstyle='butt'))
-fig.add_artist(FancyArrowPatch((vert_x, elbow_y), (vert_x, by1 + 0.0015 * bh),
+# The head reaches into the panel (0.032 bh below its top edge), as in the reference figure,
+# instead of stopping on the panel border.
+fig.add_artist(FancyArrowPatch((vert_x, elbow_y), (vert_x, by1 - 0.032 * bh),
                                transform=fig.transFigure, zorder=30,
-                               arrowstyle='-|>', mutation_scale=30,
+                               arrowstyle='-|>', mutation_scale=44,
                                color=ANNOT_COLOR, linewidth=6))
 fig.text(vert_x + 0.024 * target.width, by1 + 0.0505 * bh, 'Integrated by Eq.(3)',
          color=ANNOT_COLOR, fontsize=22, va='center', ha='left', zorder=30)
+
+if not ANNOT:                        # hide the annotation and export a bare, hand-editable base
+    for _a in list(fig.artists):
+        _a.set_visible(False)
+    for _t in list(fig.texts):
+        if _t.get_color() == ANNOT_COLOR:
+            _t.set_visible(False)
 
 os.makedirs(os.path.dirname(OUT_PDF), exist_ok=True)
 # Write the figure to the package root: the vector PDF for the paper and the same
 # figure as a PNG (for slides and quick previews).
 plt.savefig(OUT_PDF, format='pdf', dpi=300, bbox_inches='tight', pad_inches=0.05)
 print('saved:', OUT_PDF)
+plt.savefig(OUT_PDF[:-4] + '.png', format='png', dpi=PNG_DPI,
+            bbox_inches='tight', pad_inches=0.05)
+print('saved:', OUT_PDF[:-4] + '.png')
+if not ANNOT:
+    # Vector background (text kept as paths) for annotating the figure in an external editor.
+    _svg = OUT_PDF[:-4] + '.svg'
+    plt.savefig(_svg, format='svg', bbox_inches='tight', pad_inches=0.05)
+    print('saved:', _svg)
 
 # Panel SRCC (largest |SRCC| over lag = -6..-1) is written to a CSV so that
 # table 1/table_1.py --verify can cross-check its own SRCC values against it.

@@ -1,0 +1,16 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+.venv
+venv
+*.aux
+*.log
+*.out
+*.synctex.gz
+
+# Written by step 1 and regenerated on every run, so not worth shipping in the image
+fig_and_table
+fig_*.pdf
+fig_*.png
+table_*.csv

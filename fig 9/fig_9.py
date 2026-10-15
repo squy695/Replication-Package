@@ -25,6 +25,8 @@ OUT_PDF = os.path.join(os.path.dirname(HERE), "fig_RQ2.pdf")
 N_VARIANTS, N_REAL = 5, 5
 DROP_FIRST_VARIANT_ROW = True
 SLO = 500.0
+# Legend entry for the SLO line, worded as in Fig 7 so the two figures agree.
+SLO_LABEL = "SLO (500ms)"
 
 # Benchmarks and autoscalers covered by the figure.
 BM = [
@@ -135,6 +137,7 @@ for bm, vardir, realdir in BM:
 # Layout.
 fig, axes = plt.subplots(2, 4, figsize=(21.0, 9.4), sharex=True, sharey="row")
 handles = {}
+slo_line = None
 
 for col, ax in enumerate(axes[0]):
     variant, title = PANELS[col]
@@ -178,7 +181,10 @@ for col, ax in enumerate(axes[1]):
             ax.fill_between(x, mean - sd, mean + sd, color=st["color"],
                             alpha=0.15, linewidth=0, zorder=4)
         handles.setdefault(bm, ln)
-    ax.axhline(y=SLO, color="gray", linestyle=":", linewidth=1.8, zorder=7)
+    line = ax.axhline(y=SLO, color="gray", linestyle=":", linewidth=1.8,
+                      label=SLO_LABEL, zorder=7)
+    if slo_line is None:
+        slo_line = line
     ax.text(0.04, 0.90, title, transform=ax.transAxes, fontsize=30,
             fontweight="bold", va="top", ha="left",
             bbox=dict(boxstyle="round,pad=0.3", facecolor='none', edgecolor="none"),
@@ -194,9 +200,14 @@ for ax in axes.ravel():
     ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(10))
 
-leg = fig.legend(handles=list(handles.values())[::-1],
-                 labels=[BM_STYLES[b]["label"] for b in list(handles)[::-1]],
-                 loc="lower center", bbox_to_anchor=(0.5, 0.925), ncol=3,
+legend_handles = list(handles.values())[::-1]
+legend_labels = [BM_STYLES[b]["label"] for b in list(handles)[::-1]]
+if slo_line is not None:            # the SLO line is drawn on the P90 row only
+    legend_handles.append(slo_line)
+    legend_labels.append(SLO_LABEL)
+
+leg = fig.legend(handles=legend_handles, labels=legend_labels,
+                 loc="lower center", bbox_to_anchor=(0.5, 0.925), ncol=4,
                  frameon=False, fontsize=30,
                  handlelength=2.6, handletextpad=0.6, columnspacing=1.8)
 _h = getattr(leg, 'legend_handles', None)

@@ -1,0 +1,8 @@
+# The application namespace, with Istio sidecar injection enabled.
+# `deploy.sh` creates it for you; this file is for a manual kubectl apply.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hipster
+  labels:
+    istio-injection: enabled

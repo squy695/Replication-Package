@@ -1,0 +1,88 @@
+# ---------------------------------------------------------------------------
+# Squanler runtime parameters.
+#
+# Precedence: the defaults in Config.py  <  this file  <  environment variables
+# (SQUANLER_*, PROMETHEUS_URL, KUBECONFIG). The Docker entry point therefore
+# needs no editing at all:
+#
+#   docker run --rm -e SQUANLER_AOL=2.6 -e PROMETHEUS_URL=http://... \
+#          -v ~/.kube/config:/kube/config -e KUBECONFIG=/kube/config \
+#          squanler-repro autoscale
+#
+# Point SQUANLER_CONFIG at another file to use a different parameter set.
+# ---------------------------------------------------------------------------
+
+# --- cluster / application under test -------------------------------------
+namespace: hipster                  # namespace of the application
+ingress_namespace: istio-system     # namespace of the cluster entry point
+ingress: istio-ingressgateway       # name of the cluster entry point
+
+# HTTP status classes counted separately (Python regex, Prometheus syntax)
+cycles: ['2..', '302', '5..']
+
+# parent -> child call chains caused by API redirection (Step 2 of the paper)
+redict_chain:
+  - ['/setCurrency && POST', '/ && GET']
+
+# --- Squanler parameters --------------------------------------------------
+SLO: 500            # target end-to-end latency, milliseconds
+AOL: 1.0            # average outside latency, seconds (the paper's default)
+scale_interval: 30  # seconds between two scaling decisions
+duration: 3600      # seconds to run
+step: 5             # Prometheus query step, seconds
+request: 150        # CPU request of one instance, millicores
+min_pod: 1
+max_pod: 100
+no_patch: []        # services Squanler must leave alone, e.g. ['frontend']
+
+# --- Prometheus -----------------------------------------------------------
+# PROMETHEUS_URL overrides both URLs below; otherwise set them explicitly.
+prometheus_url: "http://prometheus.istio-system:9090"
+prom_range_url: ""
+prom_no_range_url: ""
+
+# Label matchers that identify the entry point's metrics. Left empty, they
+# default to {app: <ingress>}, which is what the Prometheus installed by
+# artifact/deploy/deploy.sh exposes. Prometheus setups differ: the Istio addon
+# labels the gateway's metrics with `app` but not with `namespace`, while other
+# scrapers add `namespace` too -- add it if yours does, e.g.
+#   prom_match: {app: istio-ingressgateway, namespace: istio-system}
+# or from the environment: SQUANLER_PROM_MATCH="app=istio-ingressgateway"
+prom_match: {}
+
+# --- Kubernetes access ----------------------------------------------------
+# Empty means: use KUBECONFIG, or the in-cluster service account.
+kubeconfig: ""
+dry_run: false      # true: log every decision but patch nothing
+
+# --- CCpR matrix (Step 1) -------------------------------------------------
+# svcs: the index of each CCpR row below refers to this order.
+svcs:
+  - frontend
+  - adservice
+  - cartservice
+  - checkoutservice
+  - currencyservice
+  - emailservice
+  - paymentservice
+  - productcatalogservice
+  - recommendationservice
+  - shippingservice
+
+# interfaces: API -> [CCpR row (millicores per request), SLO (ms)].
+# CCpR values are hardware dependent; to re-measure one API's row, inject
+# workload into that API, wait for it to stabilize, then query
+#   sum(rate(container_cpu_usage_seconds_total{namespace="hipster",
+#       pod=~".*frontend.*", container!~"POD|istio-proxy"}[90s])) * 1000
+#   /
+#   sum(rate(istio_request_duration_milliseconds_count{destination_app="frontend",
+#       namespace="hipster", request_operation="/ && GET",
+#       response_code!~"5.."}[90s]))
+# and store the resulting average at the index of that service. A whole matrix
+# can also be supplied with SQUANLER_CCPR=/path/to/matrix.yaml.
+interfaces:
+  "/ && GET": [[4.58, 0.58, 0.68, 0.15, 6.86, 0.40, 0.16, 0.47, 0.39, 0.21], 500]
+  "/product/{id} && GET": [[8.42, 0.47, 1.06, 0.08, 4.35, 0.09, 1.9, 2.8, 2.5, 0.05], 500]
+  "/cart && GET": [[7.23, 0.03, 1.23, 0.72, 3.24, 0.11, 1.1, 2.14, 2.14, 0.5], 500]
+  "/cart/checkout && POST": [[7.69, 0.05, 3.5, 23.36, 10.66, 2.4, 0.52, 2.8, 8.6, 0.93], 500]
+  "/setCurrency && POST": [[9.1, 0.04, 1.87, 1.8, 19.12, 0, 0, 0.89, 3.7, 0], 500]

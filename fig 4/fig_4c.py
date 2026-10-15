@@ -12,14 +12,17 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))                # Replication Pa
 OUT = os.path.join(ROOT, 'fig_motivation_2_c.pdf')
 
 # Figure style (matplotlib rcParams).
+# Overall scaling factor for the in-figure text (so that in print it matches fig_SRCC).
+FS_SCALE = 1.15
+
 rcParams['font.family'] = 'Times New Roman'
-rcParams['font.size'] = 14
+rcParams['font.size'] = 14 * FS_SCALE
 rcParams['axes.labelweight'] = 'bold'
 rcParams['axes.linewidth'] = 1.2
 rcParams['xtick.major.pad'] = 9.5
 rcParams['ytick.major.pad'] = 9.5
 
-FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19, 17, 19, 16
+FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19 * FS_SCALE, 17 * FS_SCALE, 19 * FS_SCALE, 16 * FS_SCALE
 
 # Load and prepare CPU usage data
 df_normal = pd.read_csv(os.path.join(DATA, 'CPU usage.csv'))

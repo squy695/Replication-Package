@@ -1,0 +1,37 @@
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: istio-attributegen-filter-ingress
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+      istio: ingressgateway
+  url: https://storage.googleapis.com/istio-build/proxy/attributegen-359dcd3a19f109c50e97517fe6b1e2676e870c4d.wasm
+  imagePullPolicy: Always
+  phase: AUTHN
+  pluginConfig:
+    attributes:
+      - output_attribute: "istio_operationId"
+        match:
+          - value: "/ && GET"
+            condition: "request.url_path == '/' && request.method == 'GET'"
+          - value: "/product/{id} && GET"
+            condition: "request.url_path.matches('^/product/[0-9][[:alnum:]]*$') && request.method == 'GET'"
+          - value: "/product/{id} && GET"
+            condition: "request.url_path.matches('^/product/[a-zA-Z][[:alnum:]]*$') && request.method == 'GET'"
+          - value: "/cart && GET"
+            condition: "request.url_path == '/cart' && request.method == 'GET'"
+          - value: "/cart && POST"
+            condition: "request.url_path == '/cart' && request.method == 'POST'"
+          - value: "/cart/checkout && POST"
+            condition: "request.url_path == '/cart/checkout' && request.method == 'POST'"
+          - value: "/setCurrency && POST"
+            condition: "request.url_path == '/setCurrency' && request.method == 'POST'"
+          - value: "/logout"
+            condition: "request.url_path == '/logout'"
+          - value: "/static/"
+            condition: "request.url_path == '/static/'"
+          - value: "/robots.txt"
+            condition: "request.url_path == '/robots.txt'"

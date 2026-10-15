@@ -1,0 +1,45 @@
+# Same plugin as artifact/onlineboutique/wasmPlugin.yaml, except that the module
+# is fetched from the in-cluster wasm-server (artifact/deploy/20-wasm-server.yaml)
+# instead of storage.googleapis.com. Use it when the cluster has no egress:
+#
+#   sha256 of artifact/onlineboutique/attributegen.wasm:
+#   3c807c3f48af481e4dda7d9fe54364d921bb7e88122765f67f6c9b9cb28a52a6
+#
+# `deploy.sh --local-wasm` applies this file instead of the original one.
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: istio-attributegen-filter-ingress
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+      istio: ingressgateway
+  url: http://wasm-server.istio-system.svc.cluster.local:8080/attributegen.wasm
+  imagePullPolicy: Always
+  phase: AUTHN
+  pluginConfig:
+    attributes:
+      - output_attribute: "istio_operationId"
+        match:
+          - value: "/ && GET"
+            condition: "request.url_path == '/' && request.method == 'GET'"
+          - value: "/product/{id} && GET"
+            condition: "request.url_path.matches('^/product/[0-9][[:alnum:]]*$') && request.method == 'GET'"
+          - value: "/product/{id} && GET"
+            condition: "request.url_path.matches('^/product/[a-zA-Z][[:alnum:]]*$') && request.method == 'GET'"
+          - value: "/cart && GET"
+            condition: "request.url_path == '/cart' && request.method == 'GET'"
+          - value: "/cart && POST"
+            condition: "request.url_path == '/cart' && request.method == 'POST'"
+          - value: "/cart/checkout && POST"
+            condition: "request.url_path == '/cart/checkout' && request.method == 'POST'"
+          - value: "/setCurrency && POST"
+            condition: "request.url_path == '/setCurrency' && request.method == 'POST'"
+          - value: "/logout"
+            condition: "request.url_path == '/logout'"
+          - value: "/static/"
+            condition: "request.url_path == '/static/'"
+          - value: "/robots.txt"
+            condition: "request.url_path == '/robots.txt'"

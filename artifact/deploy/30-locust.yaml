@@ -1,0 +1,112 @@
+# Workload injection: Locust master + workers, hitting the Istio ingress
+# gateway so that the WasmPlugin/Telemetry labels apply (see the paper's
+# evaluation setup).
+#
+# The scripts come from the `locust-scripts` ConfigMap, which deploy.sh builds
+# from artifact/onlineboutique/locust/. `__SCRIPT__` is replaced by deploy.sh
+# (default: workloads/1.py, i.e. the workload of API "/ && GET").
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master
+  labels:
+    app: locust-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master
+  template:
+    metadata:
+      labels:
+        app: locust-master
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/__SCRIPT__
+            - --master
+            # start the load as soon as the master is up: without it Locust only
+            # serves its web UI and waits for someone to press Start
+            - --autostart
+            - --host
+            - http://istio-ingressgateway.istio-system
+          ports:
+            - name: web
+              containerPort: 8089
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts
+            # ConfigMap keys cannot contain '/', so the files are mapped to
+            # paths explicitly; deploy.sh substitutes __SCRIPT__ / __WAVE__.
+            items:
+              - key: script
+                path: __SCRIPT__
+              - key: wave
+                path: __WAVE__
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master
+  labels:
+    app: locust-master
+spec:
+  selector:
+    app: locust-master
+  ports:
+    - name: web
+      port: 8089
+      targetPort: 8089
+    - name: master
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker
+  labels:
+    app: locust-worker
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: locust-worker
+  template:
+    metadata:
+      labels:
+        app: locust-worker
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: locust
+          image: locustio/locust:2.20.1
+          args:
+            - -f
+            - /mnt/locust/__SCRIPT__
+            - --worker
+            - --master-host
+            - locust-master
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/locust
+      volumes:
+        - name: scripts
+          configMap:
+            name: locust-scripts
+            items:
+              - key: script
+                path: __SCRIPT__
+              - key: wave
+                path: __WAVE__

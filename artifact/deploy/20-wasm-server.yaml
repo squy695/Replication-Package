@@ -1,0 +1,45 @@
+# Optional: serves artifact/onlineboutique/attributegen.wasm from inside the
+# cluster, so that the WasmPlugin can load without egress to
+# storage.googleapis.com. `deploy.sh --local-wasm` builds and deploys this.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wasm-server
+  namespace: istio-system
+  labels:
+    app: wasm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wasm-server
+  template:
+    metadata:
+      labels:
+        app: wasm-server
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: http
+          image: wasm-server:1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /attributegen.wasm
+              port: 8080
+            initialDelaySeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wasm-server
+  namespace: istio-system
+spec:
+  selector:
+    app: wasm-server
+  ports:
+    - port: 8080
+      targetPort: 8080

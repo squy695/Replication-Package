@@ -1,0 +1,23 @@
+# ---------------------------------------------------------------------------
+# Dependencies of the reviewer-facing image.
+#   pip install -r docker/requirements.txt
+# ---------------------------------------------------------------------------
+
+# Offline reproduction of every figure and table (run_all.py)
+numpy==1.24.3
+pandas==2.0.3
+matplotlib==3.7.5
+scipy==1.11.4
+
+# Squanler autoscaler (artifact/Squanler)
+kubernetes==33.1.0
+requests==2.32.4
+schedule==1.2.2
+tabulate==0.8.10
+
+# Workload injection (artifact/onlineboutique/locust).
+# gevent is pinned explicitly: the range locust accepts can resolve to a source
+# distribution, and python:3.9-slim has no C compiler. 23.9.1 ships a cp39
+# manylinux wheel.
+gevent==23.9.1
+locust==2.20.1

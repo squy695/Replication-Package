@@ -10,6 +10,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {'__pycache__', 'artifact'}
+# Every generated figure and table ends up in this folder (see collect()).
+OUT_DIR_NAME = 'fig_and_table'
 # Leftovers that running the scripts (or an editor) leaves behind.
 JUNK_DIRS = {'__pycache__', '.pytest_cache', '.ipynb_checkpoints', '.vscode', '.idea'}
 JUNK_EXT = ('.pyc', '.pyo', '.pyw', '.orig', '.bak', '.rej', '~')
@@ -19,19 +21,28 @@ WRITE_RE = re.compile(r'\.to_csv\(|json\.dump\(|open\([^)]*[\'"][wa][\'"]\)')
 OUT_EXT = ('.pdf', '.png', '.csv')
 
 # Plotting scripts backing the paper's figures. Figures that are not data-driven
-# (the schematic drawings of Fig. 1/2/6 and the analytic curve of Fig. 12) are not
-# part of this package.
+# (the schematic drawings of Fig. 1/2/6) are not part of this package; the analytic
+# curve of Fig. 12 is produced by RQ4/fig_RQ4_function.py.
 PAPER_FIGURES = [
     r'fig 3\fig_3a.py', r'fig 3\fig_3b.py', r'fig 3\fig_3c.py',    # Fig 3a-b-c
     r'fig 4\fig_4a.py', r'fig 4\fig_4b.py', r'fig 4\fig_4c.py',    # Fig 4a-b-c
-    r'fig 5\fig_5.py',                                             # Fig 5
-    r'fig 7\fig_7a.py', r'fig 7\fig_7b.py',                        # Fig 7a-b
+    r'fig 7\fig_7.py',                                             # Fig 7
     r'fig 8\fig_8.py',                                             # Fig 8
     r'fig 9\fig_9.py',                                             # Fig 9
     r'fig 10\fig_10.py',                                           # Fig 10
     r'fig 11\fig_11.py',                                           # Fig 11
     r'fig 13\fig_13.py',                                           # Fig 13
+    r'RQ4\fig_RQ4_function.py',                                    # Fig 12 (analytic curve)
 ]
+
+# Scripts that are kept for provenance but are never run: their output is shipped
+# as the camera-ready artwork instead. Fig 5 is the only such case -- the panels
+# were re-exported and hand-tuned after the script ran, so re-running it would
+# overwrite exactly the version that appears in the paper. `fig 5/srcc_panels.csv`,
+# which `table 1/table_1.py --verify` cross-checks against, is shipped too.
+SHIPPED_SCRIPTS = {
+    os.path.normpath(os.path.join(HERE, 'fig 5', 'fig_5.py')),
+}
 
 
 # Sort key that keeps "fig 2" before "fig 10".
@@ -51,6 +62,8 @@ def discover():
             if not name.endswith('.py') or name == os.path.basename(__file__):
                 continue
             path = os.path.join(root, name)
+            if os.path.normpath(path) in SHIPPED_SCRIPTS:
+                continue
             try:
                 src = open(path, encoding='utf-8').read()
             except (OSError, UnicodeDecodeError):
@@ -102,6 +115,28 @@ def clean():
     return sorted(removed)
 
 
+# Move the artifacts the scripts write at the package root into fig_and_table/,
+# the one folder that holds every generated figure and table. Outputs that live
+# in a subfolder stay there: `fig 5/srcc_panels.csv` is what `table 1/table_1.py
+# --verify` reads, so moving it would break that cross-check.
+def collect(out_dir=None):
+    out_dir = out_dir or os.path.join(HERE, OUT_DIR_NAME)
+    moved = []
+    for name in sorted(os.listdir(HERE)):
+        path = os.path.join(HERE, name)
+        if not os.path.isfile(path) or not name.lower().endswith(OUT_EXT):
+            continue
+        if not (name.startswith('fig_') or name.startswith('table_')):
+            continue
+        os.makedirs(out_dir, exist_ok=True)
+        dst = os.path.join(out_dir, name)
+        if os.path.exists(dst):
+            os.remove(dst)
+        shutil.move(path, dst)
+        moved.append(name)
+    return moved
+
+
 # CLI entry point: select the scripts, run them, report what they wrote.
 def main():
     ap = argparse.ArgumentParser(
@@ -124,6 +159,11 @@ def main():
                     help='only remove __pycache__/.vscode and other leftovers, then exit')
     ap.add_argument('--no-clean', action='store_true',
                     help='keep the leftovers instead of removing them after the run')
+    ap.add_argument('--out-dir', default=OUT_DIR_NAME, metavar='DIR',
+                    help='where to collect the generated figures and tables (default: %s)'
+                         % OUT_DIR_NAME)
+    ap.add_argument('--no-collect', action='store_true',
+                    help='leave the generated files where the scripts wrote them')
     args = ap.parse_args()
 
     if args.clean:
@@ -223,6 +263,12 @@ def main():
     print('%d files written/updated:' % len(written))
     for w in written:
         print('  %s' % w)
+
+    if not args.no_collect:
+        moved = collect(os.path.join(HERE, args.out_dir))
+        print('\ncollected %d artifact(s) into %s/' % (len(moved), args.out_dir))
+        for name in moved:
+            print('  %s' % name)
 
     if args.no_clean:
         return 0 if ok_n == len(results) else 1

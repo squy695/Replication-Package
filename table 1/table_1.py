@@ -21,11 +21,11 @@ API_COLS = {'API1': '/homepage', 'API2': '/product1', 'API3': '/product2',
             'API4': '/cart', 'API5': '/pay'}
 
 ROWS = [
-    ('Latency (HTTP code 200)', 'latency 200.csv', True,  'Latency with HTTP 200'),
-    ('Latency (HTTP code 500)', 'latency 500.csv', True,  'Latency with HTTP 500'),
-    ('RPS (HTTP code 200)',     'RPS 200.csv',         True,  'RPS with HTTP 200'),
-    ('RPS (HTTP code 500)',     'RPS 500.csv',         True,  'RPS with HTTP 500'),
-    ('Ours',                    'our quantified workload.csv',  False, 'Our quantified workload'),
+    ('Latency (HTTP 200)', 'latency 200.csv', True,  'Latency (HTTP 200)'),
+    ('Latency (HTTP 500)', 'latency 500.csv', True,  'Latency (HTTP 500)'),
+    ('RPS (HTTP 200)',     'RPS 200.csv',         True,  'RPS (HTTP 200)'),
+    ('RPS (HTTP 500)',     'RPS 500.csv',         True,  'RPS (HTTP 500)'),
+    ('Ours',                    'our represented workload.csv',  False, 'Our represented workload'),
 ]
 
 
@@ -42,7 +42,7 @@ def load_gt():
 # One measured signal for every API.
 def load_metric(fname):
     out = {}
-    p = os.path.join(F7, 'metric-quantified workload', fname)
+    p = os.path.join(F7, 'metric-represented workload', fname)
     if not os.path.exists(p):
         return out
     d = pd.read_csv(p).fillna(0)

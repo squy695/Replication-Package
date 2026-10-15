@@ -1,7 +1,6 @@
 import time
 import requests
 import Config
-from util.KubernetesClient import KubernetesClient
 import pandas as pd
 import numpy as np
 import math
@@ -16,8 +15,14 @@ class PrometheusClient:
         self.end = config.end
         self.step = config.step
         self.session = requests.Session()
-        
-        self.kube_util = KubernetesClient(config)
+
+        # No Kubernetes client here: querying Prometheus must work on its own
+        # (e.g. from a laptop that can only reach a port-forwarded Prometheus).
+        if not self.prom_no_range_url:
+            raise RuntimeError(
+                "no Prometheus endpoint configured: set prometheus_url in config.yaml "
+                "or pass PROMETHEUS_URL=http://host:port"
+            )
 
     def set_time_range(self, start, end):
         self.start = start
@@ -39,17 +44,25 @@ class PrometheusClient:
     def get_workload(self, AOL):
         res = {i:{c:[0, 0] for c in self.config.cycles} for i in self.config.interfaces.keys()}
         interval = '60s'
-        
+
+        # Label matchers of the entry point's metrics: configurable, because the
+        # labels differ between Prometheus setups (see Config.prom_match).
+        selector = ','.join(
+            "%s='%s'" % (key, value)
+            for key, value in sorted(self.config.prom_match.items())
+        )
+        selector = (selector + ',') if selector else ''
+
         for i in self.config.interfaces.keys():
-            
+
             for c in self.config.cycles:
                 # Query RPS (requests per second)
                 RPS_sql = (
-                    f"sum(rate(istio_request_duration_milliseconds_count{{app='{self.config.ingress}', namespace='{self.config.ingress_namespace}', request_operation='{i}', response_code=~'{c}'}}[{interval}]))"
+                    f"sum(rate(istio_request_duration_milliseconds_count{{{selector} request_operation='{i}', response_code=~'{c}'}}[{interval}]))"
                 )
                 # Query AIL (average inside latency)
                 AIL_sql = (
-                    f"sum(rate(istio_request_duration_milliseconds_sum{{app='{self.config.ingress}',namespace='{self.config.ingress_namespace}', request_operation='{i}', response_code=~'{c}'}}[{interval}])) / sum(rate(istio_request_duration_milliseconds_count{{app='{self.config.ingress}', namespace='{self.config.ingress_namespace}', request_operation='{i}', response_code=~'{c}'}}[{interval}]))"
+                    f"sum(rate(istio_request_duration_milliseconds_sum{{{selector} request_operation='{i}', response_code=~'{c}'}}[{interval}])) / sum(rate(istio_request_duration_milliseconds_count{{{selector} request_operation='{i}', response_code=~'{c}'}}[{interval}]))"
                 )
 
                 responses_RPS = self.execute_prom(self.prom_no_range_url, RPS_sql)
@@ -81,9 +94,9 @@ class PrometheusClient:
         # Calculate final workload for each interface
         res_workload = {}
         for i in res.keys():
-            ECCU = 0
+            workload = 0
             for c in res[i].keys():
-                ECCU += res[i][c][0] * (res[i][c][1] / 1000 + AOL)
-            res_workload[i] = ECCU
+                workload += res[i][c][0] * (res[i][c][1] / 1000 + AOL)
+            res_workload[i] = workload
         
         return res_workload

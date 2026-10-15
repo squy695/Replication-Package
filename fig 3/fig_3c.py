@@ -13,20 +13,23 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))        # Replication Package
 OUT = os.path.join(ROOT, 'fig_motivation_1_c.pdf')
 
 # Figure style (matplotlib rcParams).
+# Overall scaling factor for the in-figure text (so that in print it matches fig_SRCC).
+FS_SCALE = 1.45
+
 rcParams['font.family'] = 'Times New Roman'
-rcParams['font.size'] = 14
+rcParams['font.size'] = 14 * FS_SCALE
 rcParams['axes.labelweight'] = 'bold'
 rcParams['axes.linewidth'] = 1.2
 rcParams['xtick.major.pad'] = 6.0
 rcParams['ytick.major.pad'] = 6.0
 
-FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19, 17, 19, 16
+FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19 * FS_SCALE, 17 * FS_SCALE, 19 * FS_SCALE, 16 * FS_SCALE
 
 APIs = ['API 1', 'API 2', 'API 3', 'API 4', 'API 5']
 colors = ['#C85250', '#4A71B0', '#adac9a', '#8A6BA0', '#8A924A']
 
 # Layout.
-fig, ax = plt.subplots(figsize=(12, 6.0))
+fig, ax = plt.subplots(figsize=(14, 6.0))
 
 # Constants for positioning
 JITTER_WIDTH = 0.075
@@ -78,7 +81,7 @@ for i in range(len(APIs)):
     ax.axvline(i - 0.5, color='gray', linestyle=':', alpha=0.3)
 
 # Expand Y-axis for legends
-ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.45)
+ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.60)
 
 # Legend Construction
 legend_elements = [Line2D([0], [0], marker='o', color=c, linestyle='none', markersize=7) for c in colors]

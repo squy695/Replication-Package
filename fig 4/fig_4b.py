@@ -12,14 +12,17 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))                # Replication Pa
 OUT = os.path.join(ROOT, 'fig_motivation_2_b.pdf')
 
 # Figure style (matplotlib rcParams).
+# Overall scaling factor for the in-figure text (so that in print it matches fig_SRCC).
+FS_SCALE = 1.15
+
 rcParams['font.family'] = 'Times New Roman'
-rcParams['font.size'] = 14
+rcParams['font.size'] = 14 * FS_SCALE
 rcParams['axes.labelweight'] = 'bold'
 rcParams['axes.linewidth'] = 1.2
 rcParams['xtick.major.pad'] = 9.5
 rcParams['ytick.major.pad'] = 9.5
 
-FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19, 17, 19, 16
+FS_AXIS, FS_TICK, FS_LEGEND, FS_BAND = 19 * FS_SCALE, 17 * FS_SCALE, 19 * FS_SCALE, 16 * FS_SCALE
 
 # Load datasets and handle missing values
 df_normal = pd.read_csv(os.path.join(DATA, 'RPS HTTP code 200.csv')).replace(0, np.nan)
@@ -35,12 +38,12 @@ target_col = '/ && GET'
 if target_col in df_normal.columns:
     ax.plot(x, df_normal[target_col], color='#C85250', marker='s', markersize=4,
             markevery=markevery, linestyle='-', linewidth=1.8, zorder=10,
-            label='Return with HTTP code 200')
+            label='HTTP 200')
 
 if target_col in df_fail.columns:
     ax.plot(x, df_fail[target_col], color='#4A71B0', marker='o', markersize=4,
             markevery=markevery, linestyle='--', linewidth=1.8,
-            label='Return with HTTP code 500')
+            label='HTTP 500')
 
 # Axis styling and tick configuration
 ax.set_xlabel('Time (min)', fontsize=FS_AXIS, fontweight='bold')
