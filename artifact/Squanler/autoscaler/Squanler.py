@@ -23,6 +23,34 @@ class Squanler:
         """The AOL this decision assumes, as the paper writes it: `1s`, `2.6s`."""
         return '%gs' % self.AOL
 
+    def _print_latency(self):
+        """What each API is currently seeing, next to the SLO it is given.
+
+        All three figures come from the sample this decision was made on: `mean
+        AIL` is the request-weighted average latency of the status classes
+        Squanler counts, `p90` the 90th percentile of the same requests, `req/s`
+        their throughput. An API with no counted traffic has no latency to show.
+        """
+        res = getattr(self.prom_util, 'last_res', {}) or {}
+        p90s = getattr(self.prom_util, 'last_p90', {}) or {}
+        print("  latency each API sees (against its SLO):")
+        if not res:
+            print("    no metric sample was taken this round")
+            return
+        print("    %-24s %8s %9s %9s %7s"
+              % ('API', 'req/s', 'mean AIL', 'p90', 'SLO'))
+        for interface in sorted(res,
+                                key=lambda api: -sum(c[0] for c in res[api].values())):
+            rps = sum(class_rps for class_rps, _ in res[interface].values())
+            weighted = sum(class_rps * class_ail
+                           for class_rps, class_ail in res[interface].values())
+            ail_str = '%.1f ms' % (weighted / rps) if rps > 0 else '-'
+            p90 = p90s.get(interface, 0)
+            p90_str = '%.1f ms' % p90 if p90 > 0 else '-'
+            print("    %-24s %8.2f %9s %9s %4d ms"
+                  % (interface, rps, ail_str, p90_str,
+                     self.config.CCpR_matrix[interface][1]))
+
     def scale(self):
         """One control step: quantify the workload, report it, then act on it."""
         self.round += 1
@@ -74,6 +102,10 @@ class Squanler:
                 shown = applied
             print("    %-24s %8.1f CPU-m / %d m  ->  %3d instance(s)  %s"
                   % (svc, cpu, self.config.request, shown, note))
+
+        # Closing line of every decision block: what the cluster looks like right
+        # now, which is what the next decision will be made on.
+        self._print_latency()
 
     def start(self):
         print("Squanler goes...")

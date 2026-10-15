@@ -27,7 +27,7 @@ redict_chain:
 # --- Squanler parameters --------------------------------------------------
 SLO: 500            # target end-to-end latency, milliseconds
 AOL: 1.0            # average outside latency, seconds (the paper's default)
-scale_interval: 30  # seconds between two scaling decisions
+scale_interval: 60  # seconds between two scaling decisions
 duration: 3600      # seconds to run
 step: 5             # Prometheus query step, seconds
 request: 150        # CPU request of one instance, millicores

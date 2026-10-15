@@ -96,14 +96,18 @@ Telemetry/WasmPlugin and the Locust workload generator, on a local kind cluster:
 docker run --rm -it --network host -v /var/run/docker.sock:/var/run/docker.sock -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config squanler-repro deploy --kind --scripts all
 ```
 
-**3. Run Squanler** -- one decision block every 30 s, logged but not applied. The container starts its
-own Prometheus port-forward, so nothing has to keep running on the host; `SQUANLER_DRY_RUN=0` lets it
-patch the deployments:
+**3. Run Squanler** -- one decision block every 60 s, applied to the deployments; each block ends with the
+latency every API is seeing, against its SLO. The container starts its own Prometheus port-forward, so
+nothing has to keep running on the host:
 
 ```text
-docker run --rm -it --network host -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config -e SQUANLER_DRY_RUN=1 squanler-repro bash /package/artifact/docker/autoscale.sh
+docker run --rm -it --network host -v "${HOME}/.kube:/root/.kube" -e KUBECONFIG=/root/.kube/config squanler-repro bash /package/artifact/docker/autoscale.sh
 ```
- 
+
+Follow it in another terminal with `kubectl -n hipster get deploy -w`. It runs for `SQUANLER_DURATION`
+(1 h by default) and stops on its own; Ctrl+C stops it early. To watch what it *would* do without
+touching a Deployment, add `-e SQUANLER_DRY_RUN=1`.
+
 **4. Remove everything again** -- the stack, the Locust pairs and the kind cluster:
 
 ```text
@@ -123,11 +127,12 @@ never labelled a request, and the zeros that follow are not Squanler's fault.
 
 ## What a decision looks like
 
-Every control step prints the workload it represented from the metrics, then the instance counts
-it derives from that workload:
+Every control step prints one block, in three parts: the workload it represented from the metrics, the
+instance counts it derives from that workload, and the latency each API is currently seeing against its
+SLO:
 
 ```text
-=== decision #1   14:54:18   SLO=500 ms  mode=dry-run ===
+=== decision #1   14:54:18   SLO=500 ms  mode=live ===
   workload represented from the metrics:
     / && GET                 workload=41.43 (1s)   (=  27.62 req/s at the SLO)
     /product/{id} && GET     workload=24.92 (1s)   (=  16.61 req/s at the SLO)
@@ -145,10 +150,14 @@ it derives from that workload:
     productcatalogservice       127.8 CPU-m / 150 m  ->    1 instance(s)
     recommendationservice       198.4 CPU-m / 150 m  ->    2 instance(s)
     shippingservice              23.0 CPU-m / 150 m  ->    1 instance(s)
+  latency each API sees (against its SLO):
+    API                         req/s  mean AIL       p90     SLO
+    / && GET                    27.62  412.6 ms  688.3 ms  500 ms
+    /product/{id} && GET        16.61  230.1 ms  391.4 ms  500 ms
+    /cart && GET                16.49  288.4 ms  505.7 ms  500 ms
+    /setCurrency && POST         9.62  199.4 ms  280.1 ms  500 ms
+    /cart/checkout && POST       8.74  268.7 ms  402.9 ms  500 ms
 ```
-
-A workload is quoted with the AOL it assumes. With
-`SQUANLER_DRY_RUN=0`, `kubectl -n hipster get deploy -w` follows the instance column.
 
 ## Options
 
@@ -173,7 +182,7 @@ Every parameter is an environment variable, i.e. one more `-e NAME=value` on the
 |---|---|---|---|
 | Average outside latency | `AOL` | `SQUANLER_AOL` | `1.0` s |
 | Target end-to-end latency | `SLO` | `SQUANLER_SLO` | `500` ms |
-| Decision interval | `scale_interval` | `SQUANLER_INTERVAL` | `30` s |
+| Decision interval | `scale_interval` | `SQUANLER_INTERVAL` | `60` s |
 | Run length | `duration` | `SQUANLER_DURATION` | `3600` s |
 | CPU request per instance | `request` | `SQUANLER_CPU_REQUEST` | `150` m |
 | Namespace / entry point | `namespace`, `ingress` | `SQUANLER_NAMESPACE`, `SQUANLER_INGRESS` | `hipster`, `istio-ingressgateway` |

@@ -48,7 +48,7 @@ if ! ready; then
   exit 1
 fi
 
-echo "== running Squanler: every ${SQUANLER_INTERVAL:-30}s for ${SQUANLER_DURATION:-3600}s,\
+echo "== running Squanler: every ${SQUANLER_INTERVAL:-60}s for ${SQUANLER_DURATION:-3600}s,\
  AOL=${SQUANLER_AOL:-1.0}s, SLO=${SQUANLER_SLO:-500}ms, dry_run=${SQUANLER_DRY_RUN:-0} =="
 export PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:${LOCAL_PORT}}"
 exec python /package/artifact/Squanler/main.py "$@"

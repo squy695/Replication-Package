@@ -53,6 +53,12 @@ class PrometheusClient:
         )
         selector = (selector + ',') if selector else ''
 
+        # p90 is asked for as one number per API (over every status class counted),
+        # not per class: the latency a request sees is a property of the API, and a
+        # per-class percentile could not be recombined by weighting afterwards.
+        counted = '|'.join(self.config.cycles)
+        self.last_p90 = {}
+
         for i in self.config.CCpR_matrix.keys():
 
             for c in self.config.cycles:
@@ -79,6 +85,17 @@ class PrometheusClient:
                 
                 res[i][c] = [RPS, AIL]
 
+            # p90 of the same requests: 90% of them were faster than this
+            P90_sql = (
+                f"histogram_quantile(0.90, sum(rate(istio_request_duration_milliseconds_bucket{{{selector} request_operation='{i}', response_code=~'{counted}'}}[{interval}])) by (le))"
+            )
+            responses_P90 = self.execute_prom(self.prom_no_range_url, P90_sql)
+            p90 = 0
+            if responses_P90:
+                value = float(responses_P90[0]['value'][1])
+                p90 = 0 if np.isnan(value) else value
+            self.last_p90[i] = p90
+
         # Handle redirection chains
         for chain in self.config.redict_chain:
             for i in range(len(chain) - 1):
@@ -98,5 +115,10 @@ class PrometheusClient:
             for c in res[i].keys():
                 workload += res[i][c][0] * (res[i][c][1] / 1000 + AOL)
             res_workload[i] = workload
-        
+
+        # Kept for the decision block: every control step prints, next to the
+        # allocation, what latency each API is currently seeing.
+        # Shape: {api: {status class: [RPS, AIL (ms)]}} (+ p90 in last_p90).
+        self.last_res = res
+
         return res_workload

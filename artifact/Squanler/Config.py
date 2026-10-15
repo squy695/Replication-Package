@@ -72,7 +72,7 @@ class Config:
         # Squanler parameters
         'SLO': 500,
         'AOL': 1.0,
-        'scale_interval': 30,
+        'scale_interval': 60,
         'duration': 3600,
         'step': 5,
         'request': 150,
@@ -171,7 +171,7 @@ class Config:
         self.SLO = _as_int(self.SLO, 500)
         self.step = _as_int(self.step, 5)
         self.duration = _as_int(self.duration, 3600)
-        self.scale_interval = _as_int(self.scale_interval, 30)
+        self.scale_interval = _as_int(self.scale_interval, 60)
         self.request = _as_int(self.request, 150)
         self.min_pod = _as_int(self.min_pod, 1)
         self.max_pod = _as_int(self.max_pod, 100)
