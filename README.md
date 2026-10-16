@@ -24,8 +24,8 @@ Replication Package/
 ├── fig 9/   fig_9.py                               # Fig 9      -> fig_RQ2.pdf
 ├── fig 10/  fig_10.py                              # Fig 10     -> fig_RQ3_1.pdf
 ├── fig 11/  fig_11.py                              # Fig 11     -> fig_RQ3_2.pdf
+├── fig 12/  fig_12.py                              # Fig 12     -> fig_RQ4_function.pdf
 ├── fig 13/  fig_13.py                              # Fig 13     -> fig_RQ4_alloc.pdf
-├── RQ4/     fig_RQ4_function.py                    # Fig 12     -> fig_RQ4_function.pdf
 ├── table 1/ .. table 5/                            # Table 1..5 -> table_*.csv, written in place
 │
 ├── data/                      # the only copy of the experimental data

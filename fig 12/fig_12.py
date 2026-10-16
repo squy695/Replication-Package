@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""RQ4 figure: the allocation bias caused by an AOL mismatch, and how a dropping AIL dilutes it.
+"""Fig 12 (RQ4): the allocation bias caused by an AOL mismatch, and how a dropping AIL dilutes it.
 
 The x axis is the current AIL (i.e. latency, in ms); the y axis is the allocation bias:
 
@@ -16,7 +16,7 @@ SLO = 500 ms, the SLO used by the RQ4 experiments and by the rest of the paper
 
 
 Output: Replication Package/fig_RQ4_function.pdf
-Usage: python RQ4/fig_RQ4_function.py
+Usage: python "fig 12/fig_12.py"
 """
 import os
 
