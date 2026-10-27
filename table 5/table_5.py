@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Table 5: Perf decomposition of the AOL-variant experiment (writes table_5*.csv).
+# Table 6 of the paper: Perf of the three AOL variants (writes table_5*.csv).
 import os
 import sys
 

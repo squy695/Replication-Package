@@ -24,16 +24,16 @@ OUT_EXT = ('.pdf', '.png', '.csv')
 # (the schematic drawings of Fig. 1/6) are not part of this package; the analytic
 # curve of Fig. 12 is produced by fig 12/fig_12.py.
 PAPER_FIGURES = [
-    r'fig 2\fig_2.py',                                             # Fig 2
-    r'fig 3\fig_3a.py', r'fig 3\fig_3b.py', r'fig 3\fig_3c.py',    # Fig 3a-b-c
-    r'fig 4\fig_4a.py', r'fig 4\fig_4b.py', r'fig 4\fig_4c.py',    # Fig 4a-b-c
-    r'fig 7\fig_7.py',                                             # Fig 7
-    r'fig 8\fig_8.py',                                             # Fig 8
-    r'fig 9\fig_9.py',                                             # Fig 9
-    r'fig 10\fig_10.py',                                           # Fig 10
-    r'fig 11\fig_11.py',                                           # Fig 11
-    r'fig 12\fig_12.py',                                           # Fig 12 (analytic curve)
-    r'fig 13\fig_13.py',                                           # Fig 13
+    'fig 2/fig_2.py',                                             # Fig 2
+    'fig 3/fig_3a.py', 'fig 3/fig_3b.py', 'fig 3/fig_3c.py',      # Fig 3a-b-c
+    'fig 4/fig_4a.py', 'fig 4/fig_4b.py', 'fig 4/fig_4c.py',      # Fig 4a-b-c
+    'fig 7/fig_7.py',                                             # Fig 7
+    'fig 8/fig_8.py',                                             # Fig 8
+    'fig 9/fig_9.py',                                             # Fig 9
+    'fig 10/fig_10.py',                                           # Fig 10
+    'fig 11/fig_11.py',                                           # Fig 11
+    'fig 12/fig_12.py',                                           # Fig 12 (analytic curve)
+    'fig 13/fig_13.py',                                           # Fig 13
 ]
 
 # Scripts that are kept for provenance but are never run: their output is shipped

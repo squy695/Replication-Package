@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Table 3: convergence steps and the resulting Perf loss (writes table_3*.csv).
+# Table 4 of the paper: convergence steps and the resulting Perf loss (writes table_3*.csv).
 import os
 import sys
 

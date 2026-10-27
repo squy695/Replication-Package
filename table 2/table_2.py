@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Decompose the RQ2 Perf gap into the metric part and the design part (writes table_2*.csv).
+# Table 3 of the paper (RQ2): decompose the RQ1 Perf gap into the metric part and the design
+# part (writes table_2*.csv).
 import os
 
 import numpy as np

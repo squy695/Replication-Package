@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Table 4: Perf before and after noise injection (writes table_4*.csv).
+# Table 5 of the paper: Perf before and after noise injection (writes table_4*.csv).
 import os
 import sys
 
