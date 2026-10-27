@@ -230,7 +230,10 @@ for bi, block in enumerate(BLOCKS):
                 zorder=10
             )
 
-            ax.tick_params(axis='x', labelsize=23)
+            # All panels share the x axis, so the tick numbers are drawn once,
+            # on the bottom row of the bottom block only.
+            ax.tick_params(axis='x', labelsize=23,
+                           labelbottom=(bi == len(BLOCKS) - 1 and r == 1))
             ax.tick_params(axis='y', labelsize=23)
             if c:
                 # Sharing an axis across two GridSpecs only shares the limits, it
@@ -266,16 +269,23 @@ for _h in _handles:
     if hasattr(_h, 'set_markersize'):
         _h.set_markersize(11)
 
-# The shared x-axis label sits below the (b) tag, so keep it further down.
-fig.supxlabel('Time (min)', fontsize=25, fontweight='bold', y=-0.035)
-
 plt.subplots_adjust(left=0.09, right=0.97, bottom=0.065, top=0.955)
 
+# The shared x-axis label is centred on the axes block (not on the canvas, which
+# is off-centre because of the y-axis labels). Unlike Fig 10/11/13, this figure
+# carries the (a)/(b) tags below each block, so the label has to clear them: it
+# goes 1.62 in below the block, i.e. ~0.25 in below the bottom of (b).
+X_CENTER = (0.09 + 0.97) / 2.0
+X_LABEL_GAP_IN = 1.61
+fig.supxlabel('Time (min)', fontsize=25, fontweight='bold', x=X_CENTER,
+              y=0.065 - X_LABEL_GAP_IN / fig.get_figheight())
+
 # One y-axis label per block, centred on the block, plus the (a)/(b) tag the
-# caption refers to, centred directly below the block. TAG_GAP is how far below
-# the block's bottom row the tag goes: far enough to clear the x tick labels,
-# which stick ~0.5in below the axes at this font size.
-TAG_GAP = 0.62 / fig.get_figheight()
+# caption refers to, centred directly below the block. Only the bottom block has
+# to clear the x tick labels, which stick ~0.5in below the axes at this font
+# size; the upper block has none, so its tag can sit right under the axes.
+TAG_GAP_BOTTOM = 0.62 / fig.get_figheight()
+TAG_GAP_INNER = 0.16 / fig.get_figheight()
 
 for bi, block in enumerate(BLOCKS):
     left = axes[bi, 0, 0].get_position().x0
@@ -286,8 +296,15 @@ for bi, block in enumerate(BLOCKS):
     fig.text(0.0108, (top + bottom) / 2.0, block['ylabel'],
              rotation=90, ha='center', va='center', fontsize=25, fontweight='bold')
 
-    fig.text((left + right) / 2.0, bottom - TAG_GAP, block['tag'],
-             ha='center', va='top', fontsize=25, fontweight='bold')
+    if bi == len(BLOCKS) - 1:
+        # Bottom tag: below the x tick labels, same gap the axis label uses.
+        tag_y, tag_va = bottom - TAG_GAP_BOTTOM, 'top'
+    else:
+        # Inner tag: centred in the gap between this block and the next one.
+        tag_y = (bottom + axes[bi + 1, 0, 0].get_position().y1) / 2.0
+        tag_va = 'center'
+    fig.text((left + right) / 2.0, tag_y, block['tag'],
+             ha='center', va=tag_va, fontsize=25, fontweight='bold')
 
 os.makedirs(os.path.dirname(OUTPUT_PDF), exist_ok=True)
 # Write the figure to the package root.

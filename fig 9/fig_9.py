@@ -219,9 +219,14 @@ for h in _h:
     if hasattr(h, 'set_markersize'):
         h.set_markersize(11)
 
-fig.supxlabel("Time (min)", fontsize=30, fontweight="bold", y=0.022)
 plt.subplots_adjust(left=0.10, right=0.995, bottom=0.12, top=0.93,
                     hspace=0.16, wspace=0.06)
+
+# Centred on the axes block (the canvas centre is off because of the y labels)
+# and 0.897 in below it, the same gap Fig 7/10/11/13 use.
+X_CENTER = (0.10 + 0.995) / 2.0
+fig.supxlabel("Time (min)", fontsize=30, fontweight="bold", x=X_CENTER,
+              y=0.12 - 1.05 / fig.get_figheight())
 # Write the figure to the package root.
 fig.savefig(OUT_PDF, format="pdf", dpi=300, bbox_inches="tight", pad_inches=0.05)
 print("saved:", OUT_PDF)

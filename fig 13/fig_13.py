@@ -14,6 +14,8 @@ rcParams['axes.labelweight'] = 'bold'
 rcParams['axes.linewidth'] = 1.2
 rcParams['xtick.major.pad'] = 12.5
 rcParams['ytick.major.pad'] = 12.5
+# The legend uses mathtext (variant names as subscripts); the default DejaVu does not match Times.
+rcParams['mathtext.fontset'] = 'stix'
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.join(HERE, '..', 'data', 'rq4')
@@ -46,9 +48,9 @@ BENCHMARK_SERVICES = {
 }
 
 VARIANTS = [
-    ('Squanler Exact AOL', 'Squanler (Exact AOL)', '#C85250', '-', 's'),
-    ('Squanler Low AOL',   'Squanler (Low AOL)',   '#4A71B0', '--',  'o'),
-    ('Squanler High AOL',  'Squanler (High AOL)',  '#adac9a', '-.', '^'),
+    ('Squanler Exact AOL', r'$\mathrm{Squanler}_{\mathrm{Exact\ AOL}}$', '#C85250', '-', 's'),
+    ('Squanler Low AOL',   r'$\mathrm{Squanler}_{\mathrm{Low\ AOL}}$',   '#4A71B0', '--',  'o'),
+    ('Squanler High AOL',  r'$\mathrm{Squanler}_{\mathrm{High\ AOL}}$',  '#adac9a', '-.', '^'),
 ]
 
 # Instance-count series of one (benchmark, variant, run).
