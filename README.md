@@ -80,20 +80,15 @@ docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
 #    partial runs: squanler-repro figures | tables | reproduce --list
 
 # 2. live mode: bring the stack up on a kind cluster, Locust load included
-docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+#    (macOS without host networking: point the kubeconfig at host.docker.internal
+#     and add `tls-server-name: localhost` to its cluster entry)
+docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
 
 # 3. dry run first: every decision is printed, nothing is patched
-docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 \
-  -e SQUANLER_DRY_RUN=1 -e SQUANLER_DURATION=60 \
-  -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
-  squanler-repro autoscale
+docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_DRY_RUN=1 -e SQUANLER_DURATION=60 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 
 # 4. the real run: the same command with SQUANLER_DRY_RUN=0
-docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 \
-  -e SQUANLER_AOL=1.0 -e SQUANLER_DRY_RUN=0 -e SQUANLER_DURATION=1800 \
-  -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
-  squanler-repro autoscale
+docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e SQUANLER_DRY_RUN=0 -e SQUANLER_DURATION=1800 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
 
 Every control step prints the workload reverse-quantified from the metrics and the allocation derived

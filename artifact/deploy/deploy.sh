@@ -142,6 +142,8 @@ check_cluster() {
     warn "  container itself; give the container the host network instead, e.g."
     warn "    docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock \\"
     warn "      -v \"\$HOME/.kube:/root/.kube\" squanler-repro deploy --kind"
+    warn "  without host networking (e.g. macOS), point the kubeconfig at"
+    warn "  host.docker.internal and add 'tls-server-name: localhost' to its cluster entry"
     exit 1
   }
 }
