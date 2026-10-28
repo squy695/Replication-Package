@@ -75,6 +75,12 @@ Replication Package/
 ├── fig 12/  fig_12.py                              # Fig 12     → fig_RQ4_function.pdf
 ├── fig 13/  fig_13.py                              # Fig 13     → fig_RQ4_alloc.pdf
 │
+├── table 1/ table_1.py                             # Table 1    → table_1.csv
+├── table 2/ table_2.py                             # Table 3    → table_2*.csv
+├── table 3/ table_3.py convergence_steps.py        # Table 4    → table_3*.csv
+├── table 4/ table_4.py                             # Table 5    → table_4*.csv
+├── table 5/ table_5.py                             # Table 6    → table_5*.csv
+│
 ├── fig_and_table/             # every generated figure/table, incl. the archived Fig 5 artwork
 │
 ├── data/                      # the experimental data behind every figure and table
