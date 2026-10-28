@@ -69,7 +69,7 @@ Replication Package/
     └── docker/                #   Dockerfile, entrypoint.sh, requirements.txt (the reviewer image)
 ```
 
-## Quick start (Docker)
+## Quick start: Draw Figures and tables, Build the cluster, and Run Squanler
 
 ```bash
 # the Dockerfile is in artifact/docker/; the build context is the whole package
@@ -79,14 +79,13 @@ docker build -f artifact/docker/Dockerfile -t squanler-repro .   # once, ~2 min
 docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
 
 # 2. Live mode: deploy the cluster-side stack, then run the autoscaler
-#    --kind creates a local kind cluster through the host's docker daemon,
-#    hence the socket mount (drop --kind to deploy onto the cluster in $KUBECONFIG)
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+#    --network host is required: a kubeconfig points at 127.0.0.1, which inside a
+#    container is the container itself. --kind creates a local kind cluster through
+#    the host's docker daemon, hence the socket mount (drop --kind to use $KUBECONFIG).
+docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
 
 docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
-
-## Running the autoscaler
 
 `artifact/Squanler/config.yaml` holds every runtime parameter, and each of them can also be given as an
 environment variable -- which is all the container needs:
