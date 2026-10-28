@@ -1,242 +1,183 @@
 # -*- coding: utf-8 -*-
-# Table 4 of the paper: convergence steps and the resulting Perf loss (writes table_3*.csv).
+# Table 3 of the paper (RQ2): decompose the RQ1 Perf gap into the metric part and the design
+# part (writes table_3*.csv).
 import os
-import sys
 
 import numpy as np
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)                     # Replication Package
-sys.path.insert(0, HERE)
-sys.path.insert(0, ROOT)
-from convergence_steps import STEP_MINUTES, cell_steps      # noqa: E402
-from stats_utils import holm, paired_p                      # noqa: E402
+SLO = 500.0
+NUM_RUNS = 5
+ALPHAS = [0.2, 0.3, 0.5, 0.7, 0.8]
 
-BENCHMARKS = ['sock shop', 'online boutique', 'media microservice']
+EXCLUDE = {"Squanler Bad AOL"}
+SKIP_VARIANTS = {"Squanler-oracle"}
+BENCH = [("OnlineBoutique", "online boutique", "../data/rq2/variants"),
+         ("SockShop", "sock shop", "../data/rq2/variants"),
+         ("MediaMicroservice", "media microservice", "../data/rq2/variants")]
+VAR = ["Squanler-oracle", "Squanler-latency", "Squanler-rps", "Squanler-cpu"]
+SHORT = {"Squanler-oracle": "Squanler(true W)", "Squanler-latency": "Squanler-Latency",
+         "Squanler-rps": "Squanler-RPS", "Squanler-cpu": "Squanler-CPU"}
+OUT = os.path.join(ROOT, "table_3.csv")
+
 
 BENCHMARK_SERVICES = {
     'online boutique': [
-        'frontend', 'adservice', 'cartservice', 'checkoutservice',
-        'currencyservice', 'emailservice', 'paymentservice',
-        'productcatalogservice', 'recommendationservice', 'shippingservice'
+        'adservice', 'cartservice', 'checkoutservice', 'currencyservice',
+        'emailservice', 'frontend', 'paymentservice', 'productcatalogservice',
+        'recommendationservice', 'shippingservice'
     ],
     'sock shop': [
-        'front-end',
+        'catalogue', 'front-end', 'payment', 'shipping', 'user'
     ],
     'media microservice': [
-        'nginx', 'review-service',
+        'review-service', 'movie-id-service', 'movie-review-service', 'nginx',
+        'rating-service', 'review-storage-service', 'text-service',
+        'unique-id-service', 'user-review-service', 'user-service'
     ]
 }
 
-METHODS = ['SHOWAR', 'Microscaler', 'PBScaler', 'Derm', 'KHPA', 'Squanler']
 
-COUNTEREXAMPLE_CELLS = {('media microservice', 'PBScaler')}
-
-SLO_THRESHOLD = 500.0
-TOTAL_MINUTES = 15.0
-ALPHA = 0.5
-
-OUT_CSV = os.path.join(ROOT, "table_3.csv")
-
-
-# Per-step series of one run.
-def load_raw_series(benchmark, method, turn):
-    p90_path = os.path.join(ROOT, "data", "rq3_1", benchmark, method,
-                        str(turn), "p90.csv")
-    count_path = os.path.join(ROOT, "data", "rq3_1", benchmark, method,
-                          str(turn), "count.csv")
-
-    if not os.path.exists(p90_path) or not os.path.exists(count_path):
-        return None, None
-
-    try:
-        df_p90 = pd.read_csv(p90_path)
-        p90_series = df_p90['avg'].values if 'avg' in df_p90.columns else df_p90.iloc[:, 0].values
-
-        df_count = pd.read_csv(count_path)
-
-        target_services = list(dict.fromkeys(BENCHMARK_SERVICES.get(benchmark, [])))
-        count_cols = [c for c in target_services if c in df_count.columns]
-
-        if not count_cols:
-            count_cols = [c for c in df_count.columns if c.lower() not in ['time', 'timestamp', 'index', 'unnamed: 0']]
-
-        if count_cols:
-            df_count_clean = df_count[count_cols].fillna(0)
-            count_series = df_count_clean.sum(axis=1).values
-        elif 'count' in df_count.columns:
-            count_series = df_count['count'].fillna(0).values
-        else:
-            return None, None
-
-        return p90_series, count_series
-
-    except Exception as e:
-        return None, None
+# Instance-count columns that take part in the sum.
+def canonical_cols(bm, columns):
+    want = BENCHMARK_SERVICES.get(bm)
+    if want:
+        hit = [c for c in want if c in columns]
+        if hit:
+            return hit
+    drop = ("__index__", "unknown", "time", "timestamp", "index", "unnamed: 0")
+    return [c for c in columns if str(c).lower() not in drop]
 
 
-# Perf before and after convergence, and the resulting loss.
-def calculate_performances(p90_series, count_series, conv_time, max_replicas, max_vio, alpha=ALPHA, slo=SLO_THRESHOLD):
-    def perf(avg_replicas, vio_rate):
-        return alpha * (1 - avg_replicas / max_replicas) + (1 - alpha) * (1 - vio_rate / max_vio)
-
-    if np.isnan(conv_time):
-        return np.nan, np.nan, np.nan
-
-    if conv_time <= 0.0:
-        steady_perf = perf(float(np.mean(count_series)), float(np.mean(p90_series > slo)))
-        return 1.0, steady_perf, 0.0
-
-    p90_conv_idx = int((conv_time / TOTAL_MINUTES) * len(p90_series))
-    count_conv_idx = int((conv_time / TOTAL_MINUTES) * len(count_series))
-
-    p90_conv_idx = min(p90_conv_idx, int(len(p90_series) * 0.9))
-    count_conv_idx = min(count_conv_idx, int(len(count_series) * 0.9))
-
-    conv_perf = perf(float(np.mean(count_series[:count_conv_idx])),
-                     float(np.mean(p90_series[:p90_conv_idx] > slo)))
-
-    steady_perf = perf(float(np.mean(count_series[count_conv_idx:])),
-                       float(np.mean(p90_series[p90_conv_idx:] > slo)))
-
-    # The paper's definition of the Perf change caused by Ambiguity (eq. for
-    # `Delta Perf^Ambiguity`): the Perf measured during convergence minus the
-    # steady-state Perf, weighted by the fraction of the run spent converging.
-    # Negative therefore means the autoscaler was worse before converging -- the
-    # usual case -- and the cells where it went the other way stay positive.
-    time_weight = conv_time / TOTAL_MINUTES
-    delta_perf = float((conv_perf - steady_perf) * time_weight)
-
-    return conv_perf, steady_perf, delta_perf
+# Perf inputs of one run.
+def one_run(run_dir: str, bm: str = None):
+    cf = os.path.join(run_dir, "count.csv")
+    pf = os.path.join(run_dir, "p90.csv")
+    if not (os.path.exists(cf) and os.path.exists(pf)):
+        return None
+    c = pd.read_csv(cf, encoding="utf-8-sig")
+    cols = canonical_cols(bm, list(c.columns))
+    rep = float(c[cols].sum(axis=1).mean())
+    p = pd.read_csv(pf, encoding="utf-8-sig")
+    lat = p["avg"] if "avg" in p.columns else p.iloc[:, 0]
+    return rep, float((lat > SLO).mean())
 
 
-# Compute Table 3 and save the CSVs.
-def main():
-    results = []
-    cell_lists = {}
-    for bm in BENCHMARKS:
-        method_stats = {}
-        for method in METHODS:
-            reps, vios = [], []
-            for turn in range(1, 6):
-                p90, count = load_raw_series(bm, method, turn)
-                if p90 is not None and count is not None:
-                    reps.append(float(np.mean(count)))
-                    vios.append(float(np.mean(p90 > SLO_THRESHOLD)))
-            if reps:
-                method_stats[method] = (float(np.mean(reps)), float(np.mean(vios)))
+# Average a method over its runs.
+def collect(bm: str, variant_root: str, kind: str, method: str, root: str):
+    got = [one_run(os.path.join(HERE, root, bm, method, str(r)), bm)
+           for r in range(1, NUM_RUNS + 1)]
+    got = [g for g in got if g is not None]
+    if not got:
+        return None
+    return {"benchmark": bm, "kind": kind, "method": method,
+            "short": SHORT.get(method, method),
+            "avg_replicas": float(np.mean([g[0] for g in got])),
+            "vio": float(np.mean([g[1] for g in got])), "n_runs": len(got)}
 
-        if not method_stats:
+
+rows = []
+for label, bm, variant_root in BENCH:
+    real_base = os.path.join(HERE, "..", "data", "rq2", bm)
+    for m in sorted(os.listdir(real_base)):
+        if (os.path.isdir(os.path.join(real_base, m)) and m != "workload"
+                and m not in EXCLUDE):
+            r = collect(bm, variant_root, "real", m, os.path.join("..", "data", "rq2"))
+            if r:
+                r["benchmark"] = label
+                r["method"] = {"Microscaler": "Microscaler"}.get(r["method"],
+                                                                 r["method"])
+                r["short"] = SHORT.get(r["method"], r["method"])
+                rows.append(r)
+    for v in VAR:
+        if v in SKIP_VARIANTS:
             continue
+        r = collect(bm, variant_root, "variant", v, variant_root)
+        if r:
+            r["benchmark"] = label
+            rows.append(r)
 
-        max_inst = max(v[0] for v in method_stats.values())
-        max_vio = max(v[1] for v in method_stats.values())
-        global_max_inst = max_inst if max_inst > 0 else 1.0
-        global_max_vio = max_vio if max_vio > 0 else 1.0
+df = pd.DataFrame(rows)
+if df.empty:
+    raise SystemExit("no data collected")
 
-        bm_results = []
-        for method in METHODS:
-            steps_mean, n_conv, n_total = cell_steps(bm, method, series='paper')
-            conv_time = steps_mean * STEP_MINUTES if steps_mean is not None else np.nan
+out = []
+for label, g in df.groupby("benchmark", sort=False):
+    gmax_inst = float(g["avg_replicas"].max())
+    gmax_vio = float(g["vio"].max()) or 1.0
+    g = g.copy()
+    g["res_term"] = g["avg_replicas"] / gmax_inst
+    g["vio_term"] = g["vio"] / gmax_vio
+    out.append(g)
+res = pd.concat(out, ignore_index=True)
+for a in ALPHAS:
+    res[f"performance_a{a}"] = (a * (1 - res["res_term"])
+                                + (1 - a) * (1 - res["vio_term"]))
 
-            conv_list = []
-            steady_list = []
-            delta_list = []
-            raw_gap_list = []
+for label, g in res.groupby("benchmark", sort=False):
+    base = g.loc[g["short"] == "Squanler", "performance_a0.5"]
+    ref = float(base.iloc[0]) if len(base) else float("nan")
+    for _, r in g.sort_values("performance_a0.5", ascending=False).iterrows():
+        d = r["performance_a0.5"] - ref
+        dv = 100.0 * d / ref if ref == ref and ref > 0 else float("nan")
 
-            for turn in range(1, 6):
-                p90, count = load_raw_series(bm, method, turn)
-                if p90 is not None and count is not None:
-                    c_p, s_p, dp = calculate_performances(
-                        p90_series=p90,
-                        count_series=count,
-                        conv_time=conv_time,
-                        max_replicas=global_max_inst,
-                        max_vio=global_max_vio
-                    )
-                    if not np.isnan(dp):
-                        conv_list.append(c_p)
-                        steady_list.append(s_p)
-                        delta_list.append(dp)
-                        raw_gap_list.append(s_p - c_p)
-
-            def get_stat_str(val_list):
-                if val_list:
-                    m = float(np.mean(val_list))
-                    s = float(np.std(val_list, ddof=1)) if len(val_list) > 1 else 0.0
-                    return f"{m:.4f} ± {s:.4f}"
-                return "NaN (Unconverged)"
-
-            conv_str = get_stat_str(conv_list)
-            steady_str = get_stat_str(steady_list)
-            delta_str = get_stat_str(delta_list)
-
-            no_steady = bool(raw_gap_list and steps_mean is not None and steps_mean > 0
-                             and np.mean(raw_gap_list) <= 0
-                             and (bm, method) not in COUNTEREXAMPLE_CELLS)
-            if no_steady:
-                conv_str = steady_str = delta_str = '-- (No steady state)'
-            elif raw_gap_list and (bm, method) in COUNTEREXAMPLE_CELLS:
-                # raw_gap_list stays steady - conv, because the test just above
-                # reads it in that order; only what is reported is flipped, to the
-                # paper's conv - steady. The std does not care about the sign.
-                raw_delta = -float(np.mean(raw_gap_list)) * (conv_time / TOTAL_MINUTES)
-                s = float(np.std([g * (conv_time / TOTAL_MINUTES) for g in raw_gap_list], ddof=1)) \
-                    if len(raw_gap_list) > 1 else 0.0
-                delta_str = f"{raw_delta:.4f} ± {s:.4f}"
-                delta_list = [-g * (conv_time / TOTAL_MINUTES) for g in raw_gap_list]
-            cell_lists[(bm, method)] = (list(conv_list), list(steady_list),
-                                        bool(no_steady or steps_mean == 0))
-
-            bm_results.append({
-                'method': method,
-                'steps': ('--' if steps_mean is None else '%.2f' % steps_mean),
-                'conv_min': ('--' if steps_mean is None else '%.2f' % conv_time),
-                'conv_perf': conv_str,
-                'steady_perf': steady_str,
-                'delta_perf': delta_str
-            })
-
-            results.append({
-                'benchmark': bm,
-                'method': method,
-                'steps': (np.nan if steps_mean is None else round(steps_mean, 4)),
-                'n_converged': n_conv,
-                'n_total': n_total,
-                'conv_time_min': (np.nan if steps_mean is None else round(conv_time, 4)),
-                'conv_perf': conv_str,
-                'steady_perf': steady_str,
-                'delta_perf': delta_str
-            })
-
-        if results:
-            pd.DataFrame(results).to_csv(OUT_CSV, index=False)
-
-    if cell_lists:
-        stats_rows = []
-        for bm in BENCHMARKS:
-            pv = {}
-            for method in METHODS:
-                conv_l, steady_l, skip = cell_lists.get((bm, method), ([], [], True))
-                if not skip and len(conv_l) > 1:
-                    pv[method] = paired_p(conv_l, steady_l)
-            hp = holm(pv)
-            for method in METHODS:
-                conv_l, steady_l, skip = cell_lists.get((bm, method), ([], [], True))
-                if skip or not conv_l:
-                    continue
-                # Same sign convention as the table above: conv - steady, i.e.
-                # negative for the usual case of being worse before converging.
-                # (The paired test and its p-values do not depend on the sign.)
-                raw = float(np.mean(conv_l)) - float(np.mean(steady_l))
-                p = pv.get(method, float('nan'))
-                hpv = hp.get(method, float('nan'))
-                stats_rows.append({'benchmark': bm, 'method': method, 'delta_perf': raw,
-                                   'paired_p': p, 'holm_p': hpv, 'n_pairs': len(conv_l)})
-        stats_out = os.path.join(os.path.dirname(OUT_CSV), 'table_3_stats.csv')
-        pd.DataFrame(stats_rows).to_csv(stats_out, index=False, encoding='utf-8-sig')
+#     share  = metric / (metric + design)
+#     latency: SHOWAR, Microscaler      RPS: PBScaler, Derm      CPU: KHPA
+FAMILY = {
+    "latency": ("Squanler-latency", ("SHOWAR", "Microscaler")),
+    "rps":     ("Squanler-rps",     ("PBScaler", "Derm")),
+    "cpu":     ("Squanler-cpu",     ("KHPA",)),
+}
 
 
-if __name__ == '__main__':
-    main()
+# Split the Perf gap into the metric part and the design part.
+def decompose(col: str):
+    rows = []
+    for label, g in res.groupby("benchmark", sort=False):
+        perf = {str(k).lower(): float(v) for k, v in zip(g["short"], g[col])}
+        full = perf.get("squanler")
+        if full is None:
+            continue
+        for fam, (variant, bases) in FAMILY.items():
+            vname = SHORT[variant].lower()
+            if vname not in perf:
+                continue
+            missing = [b for b in bases if b.lower() not in perf]
+            if missing:
+                pass
+            cand = [(b, perf[b.lower()]) for b in bases if b.lower() in perf]
+            if not cand:
+                continue
+            bname, bperf = max(cand, key=lambda t: t[1])
+            metric = full - perf[vname]
+            design = perf[vname] - bperf
+            share = metric / (metric + design) if (metric + design) else float("nan")
+            rows.append({"benchmark": label, "family": fam, "variant": SHORT[variant],
+                         "perf_variant": perf[vname], "best_baseline": bname,
+                         "perf_best_baseline": bperf, "perf_squanler": full,
+                         "metric": metric, "design": design, "share": share})
+    return pd.DataFrame(rows)
+
+
+res["performance_mean"] = res[[f"performance_a{a}" for a in ALPHAS]].mean(axis=1)
+d_mean = decompose("performance_mean")
+d_a05 = decompose("performance_a0.5").set_index(["benchmark", "family"])
+if not d_a05.empty:
+    for c in ("metric", "design", "share"):
+        d_mean[f"{c}_a05"] = d_mean.set_index(["benchmark", "family"]).index.map(
+            d_a05[c]).values
+
+if not d_mean.empty:
+    avg = d_mean.groupby("family")[["metric", "design"]].mean()
+    for fam, r in avg.iterrows():
+        m5 = d_mean.loc[d_mean["family"] == fam, "metric_a05"].mean()
+        d5 = d_mean.loc[d_mean["family"] == fam, "design_a05"].mean()
+        tot = r["metric"] + r["design"]
+        share = r["metric"] / tot if tot else float("nan")
+
+DECOMP_OUT = os.path.join(ROOT, "table_3_decomp.csv")
+d_mean.to_csv(DECOMP_OUT, index=False)
+
+res.to_csv(OUT, index=False)

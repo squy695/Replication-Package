@@ -3,38 +3,9 @@
 Artifacts, experimental data and the plotting/analysis scripts for the paper
 *Rethinking Metrics Quality for Microservice Autoscaling under Synchronous API Invocations*.
 
-Directories are named after what they reproduce: `fig i/` draws the paper's Fig *i*.
-`table i/` computes a table of results, which is **not** always the paper's Table *i*:
-
-| Directory | Paper table | What it computes |
-|---|---|---|
-| `table 1/` | Table 1 | SRCC of each metric against the ground truth |
-| `table 2/` | Table 3 | decomposition of the Perf gap into a metric part and a design part |
-| `table 3/` | Table 4 | trial-and-error steps before convergence |
-| `table 4/` | Table 5 | Perf before and after noise injection |
-| `table 5/` | Table 6 | Perf of the three AOL variants |
-
-Table 2 (the repetition protocol) and Fig 1/Fig 6 (schematics) are typeset directly and have no
-directory here. All raw traces are under `data/`, except the sweep traces of Fig 3, which stay in
-`fig 3/data/`.
-
-## Quick start (Docker)
-
-```bash
-# the Dockerfile is in artifact/docker/; the build context is the whole package
-docker build -f artifact/docker/Dockerfile -t squanler-repro .   # once, ~2 min
-
-# 1. Reproduce every data-driven figure and table (~2.5 min) into ./fig_and_table/
-docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
-#    partial runs: squanler-repro figures | tables | reproduce --list
-
-# 2. Live mode: deploy the cluster-side stack, then run the autoscaler
-#    --kind creates a local kind cluster through the host's docker daemon,
-#    hence the socket mount (drop --kind to deploy onto the cluster in $KUBECONFIG)
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
-
-docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
-```
+Directories are named after their paper counterpart: `fig i/` draws Fig *i*, `table i/` computes
+Table *i*. Table 2 (the repetition protocol) and Fig 1/Fig 6 (schematics) are typeset directly and have
+no directory here.
 
 ## Benchmarks and Baselines
 
@@ -63,40 +34,56 @@ Replication Package/
 ├── run_all.py                 # run every plotting script in one go
 ├── stats_utils.py             # shared statistics helpers (Holm correction, paired t-test, …)
 │
-├── fig 2/   fig_2.py                               # Fig 2      → fig_workload_ambiguity.pdf
-├── fig 3/   fig_3a.py fig_3b.py fig_3c.py  data/   # Fig 3a/b/c → fig_motivation_1_a/b/c.pdf
-├── fig 4/   fig_4a.py fig_4b.py fig_4c.py  data/   # Fig 4a/b/c → fig_motivation_2_a/b/c.pdf
-├── fig 5/   fig_5.py                               # Fig 5      → fig_SRCC.pdf + fig_SRCC.png
-├── fig 7/   fig_7.py                               # Fig 7      → fig_RQ1.pdf
-├── fig 8/   fig_8.py performance_gain.py           # Fig 8      → fig_RQ1_alpha.pdf
-├── fig 9/   fig_9.py                               # Fig 9      → fig_RQ2.pdf
-├── fig 10/  fig_10.py                              # Fig 10     → fig_RQ3_1.pdf
-├── fig 11/  fig_11.py                              # Fig 11     → fig_RQ3_2.pdf
-├── fig 12/  fig_12.py                              # Fig 12     → fig_RQ4_function.pdf
-├── fig 13/  fig_13.py                              # Fig 13     → fig_RQ4_alloc.pdf
+├── fig 2/   fig_2.py                               # fig_workload_ambiguity.pdf
+├── fig 3/   fig_3a.py fig_3b.py fig_3c.py  data/   # fig_motivation_1_a/b/c.pdf
+├── fig 4/   fig_4a.py fig_4b.py fig_4c.py  data/   # fig_motivation_2_a/b/c.pdf
+├── fig 5/   fig_5.py                               # fig_SRCC.pdf + fig_SRCC.png
+├── fig 7/   fig_7.py                               # fig_RQ1.pdf
+├── fig 8/   fig_8.py performance_gain.py           # fig_RQ1_alpha.pdf
+├── fig 9/   fig_9.py                               # fig_RQ2.pdf
+├── fig 10/  fig_10.py                              # fig_RQ3_1.pdf
+├── fig 11/  fig_11.py                              # fig_RQ3_2.pdf
+├── fig 12/  fig_12.py                              # fig_RQ4_function.pdf
+├── fig 13/  fig_13.py                              # fig_RQ4_alloc.pdf
 │
-├── table 1/ table_1.py                             # Table 1    → table_1.csv
-├── table 2/ table_2.py                             # Table 3    → table_2*.csv
-├── table 3/ table_3.py convergence_steps.py        # Table 4    → table_3*.csv
-├── table 4/ table_4.py                             # Table 5    → table_4*.csv
-├── table 5/ table_5.py                             # Table 6    → table_5*.csv
+├── table 1/ table_1.py
+├── table 3/ table_3.py
+├── table 4/ table_4.py convergence_steps.py
+├── table 5/ table_5.py
+├── table 6/ table_6.py
 │
 ├── fig_and_table/             # every generated figure/table, incl. the archived Fig 5 artwork
 │
 ├── data/                      # the experimental data behind every figure and table
-│   ├── motivation/            #   actual workload/ (API1..API5) + metric-represented workload/ (5 signals), 60-min run
-│   ├── rq1/                   #   <benchmark>/<method>/<run>/{count,p90}.csv (+ workload/)
-│   ├── rq2/                   #   same layout + variants/ (metric-fed variants replayed from the traces)
-│   ├── rq3_1/                 #   <benchmark>/<method>/<run>/ + workload 1..3/ (three injected workloads)
-│   ├── rq3_2/                 #   <benchmark>/<method>/<run>/{count,p90}.csv (noise injection)
-│   └── rq4/                   #   <benchmark>/Squanler {Exact,Low,High} AOL/<run>/{count,p90}.csv
+│   ├── motivation/
+│   ├── rq1/
+│   ├── rq2/
+│   ├── rq3_1/
+│   ├── rq3_2/
+│   └── rq4/
 │
 └── artifact/                  # deployment artifacts
     ├── Squanler/              #   config.yaml, Config.py, main.py, autoscaler/, util/, requirements.txt
     ├── onlineboutique/        #   the benchmark: manifests, Istio Telemetry + WasmPlugin, Locust scripts
     ├── deploy/                #   deploy.sh (namespace → Istio → Prometheus → app → telemetry → Locust)
-    ├── docker/                #   Dockerfile, entrypoint.sh, requirements.txt (the reviewer image)
-    └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
+    └── docker/                #   Dockerfile, entrypoint.sh, requirements.txt (the reviewer image)
+```
+
+## Quick start (Docker)
+
+```bash
+# the Dockerfile is in artifact/docker/; the build context is the whole package
+docker build -f artifact/docker/Dockerfile -t squanler-repro .   # once, ~2 min
+
+# 1. Reproduce every data-driven figure and table (~2.5 min) into ./fig_and_table/
+docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
+
+# 2. Live mode: deploy the cluster-side stack, then run the autoscaler
+#    --kind creates a local kind cluster through the host's docker daemon,
+#    hence the socket mount (drop --kind to deploy onto the cluster in $KUBECONFIG)
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+
+docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
 
 ## Running the autoscaler

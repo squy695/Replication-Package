@@ -1,201 +1,201 @@
 # -*- coding: utf-8 -*-
-# Table 6 of the paper: Perf of the three AOL variants (writes table_5*.csv).
+# Table 5 of the paper: Perf before and after noise injection (writes table_5*.csv).
 import os
 import sys
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-from stats_utils import DELTA, holm, noninferiority_p, paired_p      # noqa: E402
-
 ROOT = os.path.dirname(HERE)                     # Replication Package
-RQ1_ROOT = os.path.join(ROOT, 'data', 'rq1')
-RQ4_ROOT = os.path.join(ROOT, 'data', 'rq4')
-OUT_CSV = os.path.join(ROOT, "table_5.csv")
+sys.path.insert(0, ROOT)
+from stats_utils import holm, paired_p      # noqa: E402
 
-ALPHA = 0.5
-SLO = 500.0
-MAX_TURN = 5
 
 # Benchmarks and autoscalers covered by the figure.
-benchmarks = ['sock shop', 'online boutique', 'media microservice']
-display = {
-    'sock shop': 'Sock Shop',
-    'online boutique': 'Online Boutique',
-    'media microservice': 'Media Microservice',
-}
+benchmarks = ['online boutique', 'sock shop', 'media microservice']
 
 benchmark_services = {
     'online boutique': [
-        'adservice', 'cartservice', 'checkoutservice', 'currencyservice',
-        'emailservice', 'frontend', 'paymentservice', 'productcatalogservice',
-        'recommendationservice', 'shippingservice'
+        'frontend', 'adservice', 'cartservice', 'checkoutservice',
+        'currencyservice', 'emailservice', 'paymentservice',
+        'productcatalogservice', 'recommendationservice', 'shippingservice'
+        # 'frontend', 'cartservice', 'checkoutservice',
+        # 'currencyservice',
+        # 'productcatalogservice', 'recommendationservice',
     ],
     'sock shop': [
-        'catalogue', 'front-end', 'payment', 'shipping', 'user'
+        'front-end', #'orders', 'carts',
     ],
     'media microservice': [
-        'review-service', 'movie-id-service', 'movie-review-service', 'nginx',
-        'rating-service', 'review-storage-service', 'text-service',
-        'unique-id-service', 'user-review-service', 'user-service'
+        'nginx', 'review-service',
     ]
 }
 
-BASELINES = [
-    ('RQ1', 'SHOWAR', 'SHOWAR'),
-    ('RQ1', 'Microscaler', 'Microscaler'),
-    ('RQ1', 'PBScaler', 'PBScaler'),
-    ('RQ1', 'Derm', 'Derm'),
-    ('RQ1', 'KHPA', 'KHPA'),
+methods = [
+    'SHOWAR',
+    'Microscaler',
+    'PBScaler',
+    'Derm',
+    'KHPA',
+    'Squanler'
 ]
 
-VARIANTS = [
-    ('RQ4', 'Squanler Exact AOL', 'Exact AOL'),
-    ('RQ4', 'Squanler Low AOL', 'Low AOL'),
-    ('RQ4', 'Squanler High AOL', 'High AOL'),
-]
+SLO = 500.0
+FRONT_COUNT_ROWS = 16
+ALPHA = 0.5
+REFERENCE_METHOD = 'Squanler'
+
+output_csv_path = os.path.join(ROOT, "table_5.csv")
 
 
-# Perf inputs (instances, violation rate) of one run.
-def run_stats(root, bm, obj, turn):
-    base = RQ4_ROOT if root == 'RQ4' else RQ1_ROOT
-    run_dir = os.path.join(base, bm, obj, str(turn))
-    count_path = os.path.join(run_dir, 'count.csv')
-    p90_path = os.path.join(run_dir, 'p90.csv')
-    if not (os.path.exists(count_path) and os.path.exists(p90_path)):
+# Perf inputs before and after the noise injection.
+def extract_raw_metrics(benchmark, method, turn):
+    count_file = os.path.join(ROOT, "data", "rq3_2", benchmark, method,
+                          str(turn), "count.csv")
+    p90_file = os.path.join(ROOT, "data", "rq3_2", benchmark, method,
+                        str(turn), "p90.csv")
+
+    if not os.path.exists(count_file) or not os.path.exists(p90_file):
         return None
 
-    df_count = pd.read_csv(count_path)
-    cols = [c for c in benchmark_services.get(bm, []) if c in df_count.columns]
-    if not cols:
-        cols = [c for c in df_count.columns
-                if c.lower() not in ('time', 'timestamp', 'index', 'unnamed: 0')]
-    avg_inst = float(df_count[cols].fillna(0).sum(axis=1).mean())
+    try:
+        df_count = pd.read_csv(count_file)
+        target_service_cols = list(dict.fromkeys(benchmark_services.get(benchmark, [])))
+        count_cols = [c for c in target_service_cols if c in df_count.columns]
 
-    df_p90 = pd.read_csv(p90_path)
-    if 'avg' in df_p90.columns:
-        p90 = df_p90['avg'].to_numpy()
-    elif 'p90' in df_p90.columns:
-        p90 = df_p90['p90'].to_numpy()
-    else:
-        p90 = df_p90.iloc[:, 0].to_numpy()
-    vio = float(np.nanmean(p90 > SLO))
-
-    return avg_inst, vio
-
-
-# Collect the AOL variants and the baselines of one benchmark.
-def collect(root, bm, obj):
-    got = [run_stats(root, bm, obj, t) for t in range(1, MAX_TURN + 1)]
-    return [g for g in got if g is not None]
-
-
-records = []
-pool_info = []
-
-for bm in benchmarks:
-    pool = []                                  # [(label, [run, ...], is_variant)]
-    for root, obj, label in BASELINES:
-        runs = collect(root, bm, obj)
-        if runs:
-            pool.append((label, runs, False))
+        if not count_cols:
+            if 'count' in df_count.columns:
+                summed_count = df_count['count']
+            else:
+                return None
         else:
-            pass
-    variant_runs = {}
-    for root, obj, label in VARIANTS:
-        runs = collect(root, bm, obj)
-        variant_runs[label] = runs
-        if runs:
-            pool.append((label, runs, True))
+            df_count_clean = df_count.dropna(subset=count_cols, how='all')
+            summed_count = df_count_clean[count_cols].sum(axis=1)
+
+        total_count_rows = len(summed_count)
+        if total_count_rows < FRONT_COUNT_ROWS:
+            return None
+
+        avg_inst_front = float(summed_count.iloc[:FRONT_COUNT_ROWS].mean())
+        avg_inst_back = float(summed_count.iloc[FRONT_COUNT_ROWS:].mean())
+
+        df_p90 = pd.read_csv(p90_file)
+
+        if 'avg' in df_p90.columns:
+            p90_series = df_p90['avg']
         else:
-            pass
+            p90_series = df_p90.select_dtypes(include=[np.number]).iloc[:, 0]
 
-    def agg(runs):
-        return (float(np.mean([r[0] for r in runs])),
-                float(np.mean([r[1] for r in runs])))
+        total_p90_rows = len(p90_series)
+        if total_p90_rows == 0:
+            return None
 
-    max_inst = max(agg(r)[0] for _, r, _ in pool) or 1.0
-    max_vio = max(agg(r)[1] for _, r, _ in pool) or 1.0
-    pool_info.append((display[bm], len(pool), max_inst, max_vio))
+        front_p90_cutoff = int(np.round(total_p90_rows * (FRONT_COUNT_ROWS / total_count_rows)))
+        front_p90_cutoff = max(1, min(front_p90_cutoff, total_p90_rows - 1))
 
-    def perf_of(inst, vio):
-        return ALPHA * (1 - inst / max_inst) + (1 - ALPHA) * (1 - vio / max_vio)
+        p90_front = p90_series.iloc[:front_p90_cutoff]
+        p90_back = p90_series.iloc[front_p90_cutoff:]
 
-    for label, runs in variant_runs.items():
-        for i, (inst, vio) in enumerate(runs, start=1):
-            records.append({
-                'benchmark': display[bm],
-                'variant': label,
-                'run': i,
-                'avg_instances': inst,
-                'vio_rate': vio,
-                'res_term': inst / max_inst,
-                'vio_term': vio / max_vio,
-                'perf': perf_of(inst, vio),
-                'max_instances': max_inst,
-                'max_vio': max_vio,
-                'pool_size': len(pool),
-            })
+        vio_front = float((p90_front > SLO).mean()) if len(p90_front) > 0 else 0.0
+        vio_back = float((p90_back > SLO).mean()) if len(p90_back) > 0 else 0.0
 
-    for label, runs, is_var in pool:
-        inst, vio = agg(runs)
-        tag = ' <- variant' if is_var else ''
+        return {
+            'inst_front': avg_inst_front,
+            'inst_back': avg_inst_back,
+            'vio_front': vio_front,
+            'vio_back': vio_back
+        }
 
-df = pd.DataFrame(records)
-df.to_csv(OUT_CSV, index=False, encoding='utf-8-sig')
-
-
-LABELS = ['Exact AOL', 'Low AOL', 'High AOL']
+    except Exception as e:
+        return None
 
 
 
-stats_rows = []
+results_list = []
+all_stats = []
 
+for benchmark in benchmarks:
+    raw_data = {}
+    all_inst_values = []
+    all_vio_values = []
 
-for bm in benchmarks:
-    sub = df[df['benchmark'] == display[bm]]
-    if sub.empty:
+    for method in methods:
+        raw_data[method] = []
+        for turn in range(1, 6):
+            metrics = extract_raw_metrics(benchmark, method, turn)
+            if metrics:
+                raw_data[method].append(metrics)
+
+    if not any(raw_data[m] for m in methods):
         continue
-    aggv = sub.groupby('variant').agg(
-        avg_instances=('avg_instances', 'mean'),
-        res_term=('res_term', 'mean'),
-        vio_term=('vio_term', 'mean'),
-        perf=('perf', 'mean'),
-        perf_sd=('perf', 'std'),
-        runs=('run', 'count'),
-    )
-    base = aggv.loc['Exact AOL'] if 'Exact AOL' in aggv.index else None
-    piv = sub.pivot_table(index='run', columns='variant', values='perf')
-    base_perf = piv['Exact AOL'].to_numpy() if 'Exact AOL' in piv.columns else None
 
-    pv = {lab: (paired_p(base_perf, piv[lab].to_numpy())
-                if base_perf is not None and lab in piv.columns else float('nan'))
-          for lab in LABELS if lab != 'Exact AOL' and lab in aggv.index}
-    holm_p = holm(pv)
-    ni_p = {lab: (noninferiority_p(base_perf - piv[lab].to_numpy())
-                  if base_perf is not None and lab in piv.columns else float('nan'))
-            for lab in pv}
-
-    for label in LABELS:
-        if label not in aggv.index:
+    all_inst_values = []
+    all_vio_values = []
+    for method in methods:
+        entries = raw_data[method]
+        if not entries:
             continue
-        row = aggv.loc[label]
-        if label != 'Exact AOL' and base is not None:
-            d_perf = row['perf'] - base['perf']
-            d_alloc = (row['avg_instances'] / base['avg_instances'] - 1) * 100
-            p = pv.get(label, float('nan'))
-            stats_rows.append({
-                'benchmark': display[bm], 'variant': label,
-                'delta_perf': d_perf, 'delta_alloc_pct': d_alloc,
-                'paired_p': p, 'holm_p': holm_p[label],
-                'ni_p': ni_p.get(label, float('nan')), 'ni_delta': DELTA,
-            })
-        else:
-            pass
+        all_inst_values.extend(e[k] for e in entries for k in ('inst_front', 'inst_back'))
+        all_vio_values.extend(e[k] for e in entries for k in ('vio_front', 'vio_back'))
+
+    global_max_inst = max(all_inst_values) if max(all_inst_values) > 0 else 1.0
+    global_max_vio = max(all_vio_values) if max(all_vio_values) > 0 else 1.0
+
+    bm_pv, bm_rows = {}, []
+    for method in methods:
+        entries = raw_data[method]
+        if not entries:
+            continue
+
+        perf_before, perf_after = [], []
+        for item in entries:
+            p_front = ALPHA * (1 - item['inst_front'] / global_max_inst) + (1 - ALPHA) * (1 - item['vio_front'] / global_max_vio)
+            p_back  = ALPHA * (1 - item['inst_back']  / global_max_inst) + (1 - ALPHA) * (1 - item['vio_back']  / global_max_vio)
+
+            perf_before.append(p_front)
+            perf_after.append(p_back)
+
+        mean_before = float(np.mean(perf_before))
+        std_before = float(np.std(perf_before, ddof=1)) if len(perf_before) > 1 else 0.0
+
+        mean_after = float(np.mean(perf_after))
+        std_after = float(np.std(perf_after, ddof=1)) if len(perf_after) > 1 else 0.0
+
+        p_val = paired_p(perf_before, perf_after)
+        if method != REFERENCE_METHOD:
+            bm_pv[method] = p_val
+        bm_rows.append({'benchmark': benchmark, 'method': method,
+                        'perf_before': mean_before, 'perf_after': mean_after,
+                        'delta': mean_after - mean_before, 'paired_p': p_val})
 
 
-if stats_rows:
-    stats_csv = os.path.join(ROOT, 'table_5_stats.csv')
-    pd.DataFrame(stats_rows).to_csv(stats_csv, index=False, encoding='utf-8-sig')
+        results_list.append({
+            'benchmark': benchmark,
+            'method': method,
+            'perf_before_mean': round(mean_before, 4),
+            'perf_before_std': round(std_before, 4),
+            'perf_after_mean': round(mean_after, 4),
+            'perf_after_std': round(std_after, 4)
+        })
+
+    hp = holm(bm_pv)
+    for r in bm_rows:
+        if r['method'] == REFERENCE_METHOD:
+            r['holm_p'] = float('nan')
+            continue
+        r['holm_p'] = hp.get(r['method'], float('nan'))
+        flag = ' *' if (r['holm_p'] == r['holm_p'] and r['holm_p'] < 0.05) else '  '
+    all_stats.extend(bm_rows)
+
+
+if results_list:
+    results_df = pd.DataFrame(results_list)
+    os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+    results_df.to_csv(output_csv_path, index=False, encoding='utf-8')
+else:
+    pass
+
+if all_stats:
+    stats_out = os.path.join(os.path.dirname(output_csv_path), 'table_5_stats.csv')
+    pd.DataFrame(all_stats).to_csv(stats_out, index=False, encoding='utf-8-sig')

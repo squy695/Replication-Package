@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Detect the trial-and-error step at which each autoscaler converges (writes table_3_steps.csv).
+# Detect the trial-and-error step at which each autoscaler converges (writes table_4_steps.csv).
 import argparse
 import os
 
@@ -9,7 +9,7 @@ import pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)                     # Replication Package
 DATA = os.path.join(HERE, '..', 'data', 'rq3_1')
-OUT_CSV = os.path.join(ROOT, 'table_3_steps.csv')
+OUT_CSV = os.path.join(ROOT, 'table_4_steps.csv')
 
 BENCHMARKS = ['sock shop', 'online boutique', 'media microservice']
 WORKLOADS = ['workload 1', 'workload 2', 'workload 3']
@@ -91,7 +91,7 @@ def cell_steps(bm, method, series='paper', c_mode='tail_mean', agg='workload'):
     return (float(np.mean(vals)), len(vals), total) if vals else (None, 0, total)
 
 
-# Detect the convergence steps and write table_3_steps.csv.
+# Detect the convergence steps and write table_4_steps.csv.
 def main():
     ap = argparse.ArgumentParser(description='detect the convergence step automatically, per the criterion in the table note of the paper (RQ3_1)')
     ap.add_argument('--series', choices=['total', 'paper', 'both'], default='both')
