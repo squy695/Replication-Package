@@ -96,13 +96,13 @@ Replication Package/
     └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
 ```
 
-## Experimental Environment
+## Deploying the cluster-side stack
 
-Squanler was evaluated on Kubernetes v1.20.4 with Istio; per-API latency and RPS come from Istio
-Telemetry plus an `attributegen` WasmPlugin, all scraped by Prometheus. The custom test-bed apps are
-built from `artifact/testbed_application/`.
+Evaluation setup: Kubernetes v1.20.4 with Istio; per-API latency and RPS come from Istio Telemetry plus
+an `attributegen` WasmPlugin, all scraped by Prometheus. The custom test-bed apps are built from
+`artifact/testbed_application/`.
 
-Both of those manifests require **Istio 1.12 or newer**: `extensions.istio.io/v1alpha1` (WasmPlugin) is
+The two manifests require **Istio 1.12 or newer**: `extensions.istio.io/v1alpha1` (WasmPlugin) is
 not installed by 1.10, and `Telemetry.spec.metrics` does not exist before 1.12. `deploy.sh` therefore
 installs 1.12 by default.
 
