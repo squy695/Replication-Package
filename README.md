@@ -77,7 +77,6 @@ docker build -f artifact/docker/Dockerfile -t squanler-repro .        # ~2 min
 
 # 1. figures and tables (~2.5 min); results land in ./fig_and_table/
 docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
-#    partial runs: squanler-repro figures | tables | reproduce --list
 
 # 2. live mode: bring the stack up on a kind cluster, Locust load included, then forward
 #    its Prometheus to the host -- Squanler queries it, so keep the forward running
@@ -90,25 +89,37 @@ kubectl -n istio-system port-forward svc/prometheus 9090:9090
 # 3. the real run (SQUANLER_DRY_RUN=1 only prints the decisions; on Linux use
 #    PROMETHEUS_URL=http://localhost:9090 instead)
 docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e SQUANLER_DRY_RUN=0 -e SQUANLER_DURATION=1800 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
-```
 
-Every control step prints the workload it represents from the metrics and the allocation derived from
-it:
+# Every control step prints the workload it represents from the metrics and the allocation derived from
+# it:
+#
+# === decision #1   04:42:17   SLO=500 ms  mode=live ===
+#  our represented workload from the metrics:
+#     /cart && GET             workload=29.59 (1s)   (=  19.73 req/s at the SLO)
+#     /cart/checkout && POST   workload=28.42 (1s)   (=  18.95 req/s at the SLO)
+#     /setCurrency && POST     workload=24.50 (1s)   (=  16.34 req/s at the SLO)
+#     /product/{id} && GET     workload=15.18 (1s)   (=  10.12 req/s at the SLO)
+#     / && GET                 workload=10.05 (1s)   (=   6.70 req/s at the SLO)
+#   allocation (service -> instances):
+#     frontend                    552.9 CPU-m / 150 m  ->    4 instance(s)  
+#     adservice                    10.8 CPU-m / 150 m  ->    1 instance(s)  
+#     cartservice                 136.4 CPU-m / 150 m  ->    1 instance(s)  
+#     checkoutservice             488.0 CPU-m / 150 m  ->    4 instance(s)  
+#     currencyservice             668.2 CPU-m / 150 m  ->    5 instance(s)  
+#     emailservice                 51.2 CPU-m / 150 m  ->    1 instance(s)  
+#     paymentservice               51.9 CPU-m / 150 m  ->    1 instance(s)  
+#     productcatalogservice       141.3 CPU-m / 150 m  ->    1 instance(s)  
+#     recommendationservice       293.5 CPU-m / 150 m  ->    2 instance(s)  
+#     shippingservice              29.4 CPU-m / 150 m  ->    1 instance(s)  
+#   latency each API sees (against its SLO):
+#     API                         req/s  mean AIL       p90     SLO
+#     /cart && GET                14.62 1024.2 ms 2703.7 ms  500 ms
+#     /cart/checkout && POST      13.61 1088.5 ms 3672.4 ms  500 ms
+#     /setCurrency && POST        10.81 1267.4 ms  136.4 ms  500 ms
+#     /product/{id} && GET         7.29 1083.8 ms 2360.4 ms  500 ms
+#     / && GET                     4.57 1199.6 ms 3277.8 ms  500 ms
 
-```text
-=== decision #1   04:28:04   SLO=500 ms  mode=dry-run ===
- our represented workload from the metrics:
-    / && GET                 workload=15.92 (1s)   (=  10.61 req/s at the SLO)
-  allocation (service -> instances):
-    frontend                     48.6 CPU-m / 150 m  ->    1 instance(s)
-    adservice                     6.2 CPU-m / 150 m  ->    1 instance(s)
-    currencyservice              72.8 CPU-m / 150 m  ->    1 instance(s)
-    ...
-```
-
-Clean up (stop the port-forward, then remove the workload namespace and the kind cluster):
-
-```bash
+# 4. Clean up (stop the port-forward, then remove the workload namespace and the kind cluster)
 docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$HOME/.kube:/root/.kube" squanler-repro deploy --teardown --kind
 ```
