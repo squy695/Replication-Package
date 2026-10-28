@@ -83,9 +83,9 @@ docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
 #    its Prometheus to the host -- Squanler queries it, so keep the forward running
 #    (macOS without host networking: point the kubeconfig at host.docker.internal
 #     and add `tls-server-name: localhost` to its cluster entry)
-docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind --scripts all
 
-kubectl -n istio-system port-forward svc/prometheus 9090:9090 &
+kubectl -n istio-system port-forward svc/prometheus 9090:9090
 
 # 3. the real run (SQUANLER_DRY_RUN=1 only prints the decisions; on Linux use
 #    PROMETHEUS_URL=http://localhost:9090 instead)
@@ -104,4 +104,11 @@ it:
     adservice                     6.2 CPU-m / 150 m  ->    1 instance(s)
     currencyservice              72.8 CPU-m / 150 m  ->    1 instance(s)
     ...
+```
+
+Clean up (stop the port-forward, then remove the workload namespace and the kind cluster):
+
+```bash
+docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$HOME/.kube:/root/.kube" squanler-repro deploy --teardown --kind
 ```
