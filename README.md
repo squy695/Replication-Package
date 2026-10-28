@@ -84,26 +84,24 @@ docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
 #    (macOS without host networking: point the kubeconfig at host.docker.internal
 #     and add `tls-server-name: localhost` to its cluster entry)
 docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+
 kubectl -n istio-system port-forward svc/prometheus 9090:9090 &
 
-# 3. the real run (SQUANLER_DRY_RUN=1 only prints the decisions)
-docker run --rm --network host -e PROMETHEUS_URL=http://localhost:9090 -e SQUANLER_AOL=1.0 -e SQUANLER_DRY_RUN=0 -e SQUANLER_DURATION=1800 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
+# 3. the real run (SQUANLER_DRY_RUN=1 only prints the decisions; on Linux use
+#    PROMETHEUS_URL=http://localhost:9090 instead)
+docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e SQUANLER_DRY_RUN=0 -e SQUANLER_DURATION=1800 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
 
-Every control step prints the workload reverse-quantified from the metrics and the allocation derived
-from it:
+Every control step prints the workload it represents from the metrics and the allocation derived from
+it:
 
 ```text
-=== decision #1   14:54:18   AOL=1.0 s  SLO=500 ms  mode=dry-run ===
-  workload reverse-quantified from the metrics:
-    / && GET                    41.43 users    (=  27.62 req/s at the SLO)
-    /product/{id} && GET        24.92 users    (=  16.61 req/s at the SLO)
-    /cart && GET                24.74 users    (=  16.49 req/s at the SLO)
+=== decision #1   04:28:04   SLO=500 ms  mode=dry-run ===
+ our represented workload from the metrics:
+    / && GET                 workload=15.92 (1s)   (=  10.61 req/s at the SLO)
   allocation (service -> instances):
-    frontend                    540.4 CPU-m / 150 m  ->    4 instance(s)
-    adservice                    25.1 CPU-m / 150 m  ->    1 instance(s)
-    cartservice                 105.3 CPU-m / 150 m  ->    1 instance(s)
-    checkoutservice             238.8 CPU-m / 150 m  ->    2 instance(s)
-    currencyservice             592.2 CPU-m / 150 m  ->    4 instance(s)
+    frontend                     48.6 CPU-m / 150 m  ->    1 instance(s)
+    adservice                     6.2 CPU-m / 150 m  ->    1 instance(s)
+    currencyservice              72.8 CPU-m / 150 m  ->    1 instance(s)
     ...
 ```
