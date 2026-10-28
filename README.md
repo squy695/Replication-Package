@@ -96,16 +96,6 @@ docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:909
   squanler-repro autoscale
 ```
 
-`--network host` is required in live mode: a kubeconfig points at `127.0.0.1`, which inside a container
-is the container itself (on macOS without host networking, point the kubeconfig at
-`host.docker.internal` and add `tls-server-name: localhost`). `--kind` creates the cluster through the
-host's docker daemon, hence the socket mount; drop it to use your own `$KUBECONFIG`.
-
-`artifact/Squanler/config.yaml` documents every parameter, its default and its `SQUANLER_*` (or
-`PROMETHEUS_URL` / `KUBECONFIG`) override, so the container is never edited. Traffic must enter
-**through the gateway** for the per-API metrics -- and hence the workload -- to exist, which is what
-the bundled Locust load does.
-
 Every control step prints the workload reverse-quantified from the metrics and the allocation derived
 from it:
 
