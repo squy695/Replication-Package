@@ -36,9 +36,6 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/ro
 docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
 
-Without Docker, `python run_all.py` runs the same scripts (`--only "fig 7"` filters by path). Every script
-also runs on its own, e.g. `python "table 1/table_1.py" --verify` cross-checks Table 1 against Fig 5.
-
 ## Benchmarks and Baselines
 
 Benchmarks:
@@ -96,56 +93,6 @@ Replication Package/
     └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
 ```
 
-## Deploying the cluster-side stack
-
-Evaluation setup: Kubernetes v1.20.4 with Istio; per-API latency and RPS come from Istio Telemetry plus
-an `attributegen` WasmPlugin, all scraped by Prometheus. The custom test-bed apps are built from
-`artifact/testbed_application/`.
-
-The two manifests require **Istio 1.12 or newer**: `extensions.istio.io/v1alpha1` (WasmPlugin) is
-not installed by 1.10, and `Telemetry.spec.metrics` does not exist before 1.12. `deploy.sh` therefore
-installs 1.12 by default.
-
-`artifact/deploy/deploy.sh` brings that stack up on a cluster of your own -- Istio, its addon
-Prometheus, Online Boutique, the Telemetry/WasmPlugin pair, and Locust:
-
-```bash
-bash artifact/deploy/deploy.sh --dry-run                   # print every command first
-bash artifact/deploy/deploy.sh --kind                      # create a local kind cluster, then deploy
-bash artifact/deploy/deploy.sh --no-istio --no-prometheus  # reuse what your cluster already runs
-bash artifact/deploy/deploy.sh --teardown --kind           # remove it again
-```
-
-The WasmPlugin is attached to `istio-ingressgateway`, so the workload must enter **through the
-gateway** (which is what the bundled Locust deployment does). Traffic that bypasses the gateway still
-works but is not labeled per API, and Squanler cannot compute a workload from it.
-
-The plugin's actual code is a `.wasm` module, and `wasmPlugin.yaml` fetches it from
-`storage.googleapis.com` **at runtime, from inside the cluster**. On a cluster without egress, serve
-the copy shipped in this package instead:
-
-```bash
-bash artifact/deploy/deploy.sh --local-wasm
-```
-
-That builds the one-pod HTTP server from `artifact/onlineboutique/wasm-server.Dockerfile`, loads it
-into a kind cluster, and applies `artifact/deploy/wasmPlugin-local.yaml` (same labelling rules, URL
-inside the cluster). Either way, the entry point's metrics must carry the per-API tag:
-
-```bash
-curl -s -G --data-urlencode \
-  'query=count by (request_operation) (istio_request_duration_milliseconds_count)' \
-  http://localhost:9090/api/v1/query
-```
-
-Likewise, Squanler's PromQL matches the entry point's metrics by the labels in `prom_match`
-(`app` and `namespace` by default). Istio's own addon Prometheus exposes `app` but **no** `namespace`,
-in which case pass the labels your setup does expose:
-
-```bash
-SQUANLER_PROM_MATCH="app=istio-ingressgateway"
-```
-
 ## Running the autoscaler
 
 `artifact/Squanler/config.yaml` holds every runtime parameter, and each of them can also be given as an
@@ -173,14 +120,9 @@ docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:909
   -e SQUANLER_DRY_RUN=1 -e SQUANLER_DURATION=60 \
   -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
   squanler-repro autoscale
-
-# or from the source tree (dependencies target Python 3.9)
-cd artifact/Squanler && pip install -r requirements.txt \
-  && PROMETHEUS_URL=http://host.docker.internal:9090 KUBECONFIG="$HOME/.kube/config" python main.py
 ```
 
-The CCpR matrix in `config.yaml` was measured on our hardware; re-measuring it takes about
-`2 × |API|` minutes and is described in that file.
+The CCpR matrix in `config.yaml` was measured on our hardware; how to re-measure it is described in that file.
 
 ### Watching Squanler decide
 
