@@ -26,17 +26,18 @@ docker build -f artifact/docker/Dockerfile -t squanler-repro .   # once, ~2 min
 
 # 1. Reproduce every data-driven figure and table (~2.5 min) into ./fig_and_table/
 docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
+#    partial runs: squanler-repro figures | tables | reproduce --list
 
 # 2. Live mode: deploy the cluster-side stack, then run the autoscaler
 #    --kind creates a local kind cluster through the host's docker daemon,
 #    hence the socket mount (drop --kind to deploy onto the cluster in $KUBECONFIG)
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
-docker run --rm --network host \
-  -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 \
-  -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
-  squanler-repro autoscale
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --kind
+
+docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
+
+Without Docker, `python run_all.py` runs the same scripts (`--only "fig 7"` filters by path). Every script
+also runs on its own, e.g. `python "table 1/table_1.py" --verify` cross-checks Table 1 against Fig 5.
 
 ## Benchmarks and Baselines
 
@@ -93,27 +94,6 @@ Replication Package/
     ├── deploy/                #   deploy.sh (namespace → Istio → Prometheus → app → telemetry → Locust)
     ├── docker/                #   Dockerfile, entrypoint.sh, requirements.txt (the reviewer image)
     └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
-```
-
-## Running the plotting and table scripts
-
-`run_all.py` runs everything.
-
-```bash
-python run_all.py                 # all 21 scripts (~2.5 min)
-python run_all.py --plots-only    # the 14 plotting scripts only
-python run_all.py --tables-only   # the 7 table/analysis scripts only
-python run_all.py --list          # list what would run; --only "fig 7" filters by path
-python run_all.py --verbose       # print each script's console output
-python run_all.py --clean         # only remove the leftovers, then exit
-python run_all.py --no-clean      # run everything but keep the leftovers
-```
-
-Every script resolves its inputs relative to its own location and can also be launched on its own:
-
-```bash
-python "table 1/table_1.py" --verify   # Table 1, cross-checking fig 5/srcc_panels.csv
-python "table 1/table_1.py" --tex table1.tex
 ```
 
 ## Experimental Environment
@@ -252,6 +232,4 @@ derived from it. Example (kind cluster, 120 Locust users, AOL = 1 s):
     shippingservice              23.0 CPU-m / 150 m  ->    1 instance(s)
 ```
 
-Two checks on such a run: the reported user counts should match the injected load (120 Locust users
-with the 3:2:2:1:1 task mix put about 40 on `/ && GET`), and with `SQUANLER_DRY_RUN=0` the instance
-counts follow the patched Deployments.
+Two checks on such a run: the reported user counts should match the injected load, and with `SQUANLER_DRY_RUN=0` the instance counts follow the patched Deployments.
