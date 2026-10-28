@@ -120,6 +120,5 @@ docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:909
 #     / && GET                     4.57 1199.6 ms 3277.8 ms  500 ms
 
 # 4. Clean up (stop the port-forward, then remove the workload namespace and the kind cluster)
-docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$HOME/.kube:/root/.kube" squanler-repro deploy --teardown --kind
+docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.kube:/root/.kube" squanler-repro deploy --teardown --kind
 ```
