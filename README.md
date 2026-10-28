@@ -14,36 +14,20 @@ Directories are named after what they reproduce: `fig i/` draws the paper's Fig 
 | `table 4/` | Table 5 | Perf before and after noise injection |
 | `table 5/` | Table 6 | Perf of the three AOL variants |
 
-The paper's Table 2 (the repetition protocol) is a configuration table and is typeset directly, so it
-has no directory here. `fig i/` matches Fig *i* exactly; Fig 1 and Fig 6 are schematic drawings that
-are typeset directly as well.
-
-Raw traces live once under `data/`, with one exception: the sweep traces of Fig 3 stay in `fig 3/data/`
-because only that figure uses them.
+Table 2 (the repetition protocol) and Fig 1/Fig 6 (schematics) are typeset directly and have no
+directory here. All raw traces are under `data/`, except the sweep traces of Fig 3, which stay in
+`fig 3/data/`.
 
 ## Quick start (Docker)
 
-Everything is packaged into one image: the offline reproduction of every data-driven figure and
-table, the Squanler autoscaler, the cluster deployment helpers and the Locust workload generator.
-
 ```bash
-# `-f` and the trailing dot are both needed: the Dockerfile lives in artifact/docker/ and
-# the build context is the whole package (see the note below).
+# the Dockerfile is in artifact/docker/; the build context is the whole package
 docker build -f artifact/docker/Dockerfile -t squanler-repro .   # once, ~2 min
 
-# 1. Reproduce everything that is drawn from the traces (~2.5 min): the 10 data-driven
-#    figures and the 5 computed tables. Fig 5 ships as the camera-ready artwork and is
-#    not regenerated (see "Note" below); Fig 1 and Fig 6 are schematics and the paper's
-#    Table 2 is a configuration table, so none of those is produced by a script.
-#    The results appear in ./fig_and_table/ on the host.
+# 1. Reproduce every data-driven figure and table (~2.5 min) into ./fig_and_table/
 docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro
 
-# 2. Or only part of it
-docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro figures
-docker run --rm -v "$PWD/fig_and_table:/fig_and_table" squanler-repro tables
-docker run --rm squanler-repro reproduce --list        # show what would run
-
-# 3. Live mode: deploy the cluster-side stack, then run the autoscaler
+# 2. Live mode: deploy the cluster-side stack, then run the autoscaler
 #    --kind creates a local kind cluster through the host's docker daemon,
 #    hence the socket mount (drop --kind to deploy onto the cluster in $KUBECONFIG)
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
@@ -53,13 +37,6 @@ docker run --rm --network host \
   -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
   squanler-repro autoscale
 ```
-
-The package ships one image and no compose file, so every step is a plain `docker run`. All the
-commands are also listed by `docker run --rm squanler-repro help`.
-
-Squanler's parameters are *inputs*, not source edits: see `artifact/Squanler/config.yaml` and the
-`SQUANLER_*` / `PROMETHEUS_URL` / `KUBECONFIG` environment variables listed in
-[Running the autoscaler](#running-the-autoscaler).
 
 ## Benchmarks and Baselines
 
@@ -118,17 +95,6 @@ Replication Package/
     └── testbed_application/   #   Dockerfile and source of the custom test-bed apps
 ```
 
-The single container entry point lives in `artifact/docker/`:
-
-```text
-artifact/docker/Dockerfile        # the reviewer-facing image (offline repro + live autoscaler)
-artifact/docker/entrypoint.sh     # `reproduce` | `deploy` | `autoscale` | `load` | `shell`
-artifact/docker/requirements.txt  # every python dependency of the image
-```
-
-Build it from the package root (`-f artifact/docker/Dockerfile .`), because the build context is
-the whole package, which is what `COPY . /package/` relies on.
-
 ## Running the plotting and table scripts
 
 `run_all.py` runs everything.
@@ -184,8 +150,7 @@ bash artifact/deploy/deploy.sh --local-wasm
 
 That builds the one-pod HTTP server from `artifact/onlineboutique/wasm-server.Dockerfile`, loads it
 into a kind cluster, and applies `artifact/deploy/wasmPlugin-local.yaml` (same labelling rules, URL
-inside the cluster). Either way, check the labelling before blaming Squanler -- the entry point's
-metrics must carry the per-API tag:
+inside the cluster). Either way, the entry point's metrics must carry the per-API tag:
 
 ```bash
 curl -s -G --data-urlencode \
@@ -229,15 +194,13 @@ docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:909
   -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" \
   squanler-repro autoscale
 
-# or straight from the source tree -- the pinned dependencies target Python 3.9,
-# which the image already provides
+# or from the source tree (dependencies target Python 3.9)
 cd artifact/Squanler && pip install -r requirements.txt \
   && PROMETHEUS_URL=http://host.docker.internal:9090 KUBECONFIG="$HOME/.kube/config" python main.py
 ```
 
 The CCpR matrix in `config.yaml` was measured on our hardware; re-measuring it takes about
-`2 × |API|` minutes and is described inside that file. With a correct configuration, tail latency
-drops across all APIs.
+`2 × |API|` minutes and is described in that file.
 
 ### Watching Squanler decide
 
@@ -265,9 +228,8 @@ docker run --rm --network host -v "$HOME/.kube/config:/kube/config:ro" \
   squanler-repro autoscale
 ```
 
-Every control step prints two blocks: the workload it reverse-quantified from the metrics, and the
-instance counts it derives from that workload. This is real output from a kind cluster with 120 Locust
-users and AOL set to 1 s:
+Every control step prints the workload reverse-quantified from the metrics and the instance counts
+derived from it. Example (kind cluster, 120 Locust users, AOL = 1 s):
 
 ```text
 === decision #1   14:54:18   AOL=1.0 s  SLO=500 ms  mode=dry-run ===
@@ -290,15 +252,6 @@ users and AOL set to 1 s:
     shippingservice              23.0 CPU-m / 150 m  ->    1 instance(s)
 ```
 
-Two sanity checks are worth doing on such a run. First, the workloads should match the load you
-inject: 120 Locust users with the bundled task mix (3:2:2:1:1 over the five APIs) put about 40 users
-on `/ && GET`, and that is what the first line reports -- the reverse quantification is accurate
-precisely because `AOL` equals the think time of the injected users (`between(0.5, 1.5)` s, i.e. 1 s
-on average). Second, the instance counts should track the demand: with `SQUANLER_DRY_RUN=0`,
-`kubectl -n hipster get deploy -w` follows the third column above.
-
-*Note.* The traces under `data/` are the ones behind the paper, so `run_all.py` reproduces every figure
-and table numerically. Fig 5 is the exception: its panels were re-exported and hand-tuned for the
-camera-ready after `fig 5/fig_5.py` ran, so that PDF is shipped as-is and the script is **not** part of
-the run (`SHIPPED_SCRIPTS` in `run_all.py`); the panel data it writes, `fig 5/srcc_panels.csv`, is
-shipped too, so `table 1/table_1.py --verify` still cross-checks Fig 5 against Table 1.
+Two checks on such a run: the reported user counts should match the injected load (120 Locust users
+with the 3:2:2:1:1 task mix put about 40 on `/ && GET`), and with `SQUANLER_DRY_RUN=0` the instance
+counts follow the patched Deployments.
