@@ -69,7 +69,7 @@ Replication Package/
     └── docker/                #   Dockerfile, entrypoint.sh, requirements.txt (the reviewer image)
 ```
 
-## Quick start: Draw Figures and tables, Build the cluster, and Run Squanler
+## Quick start: draw the figures and tables, then run Squanler
 
 ```bash
 # the Dockerfile is in artifact/docker/; the build context is the whole package
@@ -87,22 +87,8 @@ docker run --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -v "
 docker run --rm --network host -e PROMETHEUS_URL=http://host.docker.internal:9090 -e SQUANLER_AOL=1.0 -e KUBECONFIG=/kube/config -v "$HOME/.kube/config:/kube/config:ro" squanler-repro autoscale
 ```
 
-`artifact/Squanler/config.yaml` holds every runtime parameter, and each of them can also be given as an
-environment variable -- which is all the container needs:
-
-| Parameter | `config.yaml` key | Environment variable | Default |
-|---|---|---|---|
-| Average outside latency | `AOL` | `SQUANLER_AOL` | `1.0` s |
-| Target end-to-end latency | `SLO` | `SQUANLER_SLO` | `500` ms |
-| Decision interval | `scale_interval` | `SQUANLER_INTERVAL` | `30` s |
-| Run length | `duration` | `SQUANLER_DURATION` | `3600` s |
-| CPU request per instance | `request` | `SQUANLER_CPU_REQUEST` | `150` m |
-| Namespace / entry point | `namespace`, `ingress` | `SQUANLER_NAMESPACE`, `SQUANLER_INGRESS` | `hipster`, `istio-ingressgateway` |
-| CCpR matrix | `interfaces` | `SQUANLER_CCPR=/path/matrix.yaml` | measured on our cluster |
-| Prometheus endpoint | `prometheus_url` | `PROMETHEUS_URL` | `http://prometheus.istio-system:9090` |
-| Label matchers of the entry point | `prom_match` | `SQUANLER_PROM_MATCH` | `app=<ingress>` |
-| Cluster credentials | `kubeconfig` | `KUBECONFIG` | in-cluster service account |
-| Safety knobs | `no_patch`, `dry_run` | `SQUANLER_NO_PATCH`, `SQUANLER_DRY_RUN` | `[]`, `false` |
+`artifact/Squanler/config.yaml` documents every runtime parameter, its default and its `SQUANLER_*`
+(or `PROMETHEUS_URL` / `KUBECONFIG`) override, so the container never has to be edited.
 
 `SQUANLER_DRY_RUN=1` logs every scaling decision without patching a single Deployment -- the quickest
 way to check that Prometheus and the CCpR matrix line up on your cluster:
